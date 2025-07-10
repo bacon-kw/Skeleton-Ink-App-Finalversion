@@ -32,11 +32,10 @@ export default function Dashboard({ user }) {
     const { data: users } = await supabase
       .from("users")
       .select("*")
-      .eq("role", "tattooist")
-      .order("order", { ascending: true });
+      .eq("role", "tattooist");
     setTattooists(users || []);
 
-    // Lade offenen Lohn pro Tätowierer (nur offene, nicht ausgezahlte Rechnungen)
+    // Lade offenen Lohn pro Tätowierer (nicht ausgezahlte Rechnungen)
     const { data: unpaid } = await supabase
       .from("invoices")
       .select("tattooist, tattooistWage, payoutDone")
@@ -44,7 +43,7 @@ export default function Dashboard({ user }) {
     const sums = {};
     unpaid?.forEach(inv => {
       if (!sums[inv.tattooist]) sums[inv.tattooist] = 0;
-      sums[inv.tattooist] += inv.tattooistWage || 0;
+      sums[inv.tattooist] += Number(inv.tattooistWage) || 0;
     });
     setPayouts(sums);
 
@@ -79,16 +78,15 @@ export default function Dashboard({ user }) {
     await loadData();
   }
 
-  // Hilfsfunktionen
   function sumInvoiceAmounts() {
-    return invoices.reduce((acc, i) => acc + (i.amount || 0), 0);
+    return invoices.reduce((acc, i) => acc + (Number(i.amount) || 0), 0);
   }
 
   function sumTattooistWage(tattooist) {
-    // Gesamtlohn (inkl. ausgezahlter)
+    // Gesamtlohn (inkl. bereits ausgezahlter Rechnungen)
     return invoices
       .filter(i => i.tattooist === tattooist)
-      .reduce((acc, i) => acc + (i.tattooistWage || 0), 0);
+      .reduce((acc, i) => acc + (Number(i.tattooistWage) || 0), 0);
   }
 
   function formatCurrency(n) {
@@ -102,7 +100,6 @@ export default function Dashboard({ user }) {
         <div className="text-center py-8 text-gray-400">Lade Daten...</div>
       ) : (
         <>
-          {/* Admin: Steuer setzen */}
           {user.role === "admin" && (
             <div className="mb-8 flex items-center gap-3">
               <span className="text-lg font-semibold">Steuersatz:</span>
