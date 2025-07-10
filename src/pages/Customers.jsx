@@ -46,8 +46,6 @@ export default function Customers({ user }) {
       tattooist: customer.tattooist,
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate
-        ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
-        : null
     });
   }
 
@@ -56,8 +54,7 @@ export default function Customers({ user }) {
     return data && data.value ? Number(data.value) : 19;
   }
 
-  async function createInvoiceForCustomer(customerId, formValues) {
-    // Erstelle die Rechnung direkt NACHDEM der Kunde gespeichert wurde!
+  async function createInvoiceForCustomer(customer) {
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
       .from("invoices")
@@ -67,7 +64,7 @@ export default function Customers({ user }) {
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
-    const sessions = Number(formValues.sessions);
+    const sessions = Number(customer.sessions);
 
     const amountNet = sessions * 1500;
     const materialCosts = sessions * 500;
@@ -78,29 +75,29 @@ export default function Customers({ user }) {
       id: uuidv4(),
       invoiceNumber,
       date: new Date(),
-      tattooist: formValues.tattooist,
-      customerName: formValues.name,
-      tattooName: formValues.tattooName,
-      placement: formValues.placement,
+      tattooist: customer.tattooist,
+      customerName: customer.name,
+      tattooName: customer.tattooName,
+      placement: customer.placement,
       sessions,
       amount: finalAmount,
       tax,
-      customerId: customerId,
+      customerId: customer.id,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
-      payoutDone: false,
-      isStudio: false
+      payoutDone: false
     }]);
   }
 
   async function saveCustomer(e) {
     e.preventDefault();
+    const now = new Date();
     if (editCustomer) {
       const { error } = await supabase.from("customers").update({
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
-        lastSessionDate: form.lastSessionDate ? new Date(form.lastSessionDate) : null
+        lastSessionDate: now
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -118,7 +115,6 @@ export default function Customers({ user }) {
         loadCustomers();
       }
     } else {
-      const now = new Date();
       const id = uuidv4();
       const { error } = await supabase.from("customers").insert([{
         id,
@@ -130,8 +126,9 @@ export default function Customers({ user }) {
         lastSessionDate: now
       }]);
       if (!error) {
-        // NUR beim Anlegen: Rechnung direkt nach erfolgreichem Insert erstellen!
-        await createInvoiceForCustomer(id, { ...form, sessions: parseInt(form.sessions) });
+        const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        await createInvoiceForCustomer(customerObj);
+
         setForm({
           name: "",
           phone: "",
@@ -165,62 +162,96 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  // Highlight, wenn letzte Session ≥2 Tage her und noch Sitzungen offen
-  function isHighlight(c) {
-    if (!c.lastSessionDate) return false;
-    const last = new Date(c.lastSessionDate);
-    const now = new Date();
-    const days = (now - last) / (1000 * 60 * 60 * 24);
-    return days >= 2 && c.doneSessions < c.sessions && !c.isArchived;
-  }
-
-  const aktiveKunden = customers.filter(c => !c.isArchived);
-  const fertigeKunden = customers.filter(c => c.isArchived);
-
   return (
     <div className="max-w-5xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
+      {/* Kundenformular */}
       <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
         <div className="flex flex-wrap gap-3">
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Name"
-            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Telefon"
-            value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            placeholder="Name"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            required
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            placeholder="Telefon"
+            value={form.phone}
+            onChange={e => setForm({ ...form, phone: e.target.value })}
+            required
+          />
         </div>
         <div className="flex flex-wrap gap-3">
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo"
-            value={form.tattooName} onChange={e => setForm({ ...form, tattooName: e.target.value })} required />
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo-Stelle"
-            value={form.placement} onChange={e => setForm({ ...form, placement: e.target.value })} required />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            placeholder="Tattoo"
+            value={form.tattooName}
+            onChange={e => setForm({ ...form, tattooName: e.target.value })}
+            required
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            placeholder="Tattoo-Stelle"
+            value={form.placement}
+            onChange={e => setForm({ ...form, placement: e.target.value })}
+            required
+          />
         </div>
         <div className="flex flex-wrap gap-3">
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={1} max={4} placeholder="Sitzungen"
-            value={form.sessions} onChange={e => setForm({ ...form, sessions: e.target.value })} required />
-          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={0} max={4} placeholder="Bisherige Sitzungen"
-            value={form.doneSessions} onChange={e => setForm({ ...form, doneSessions: e.target.value })} required />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={1}
+            max={4}
+            placeholder="Sitzungen"
+            value={form.sessions}
+            onChange={e => setForm({ ...form, sessions: e.target.value })}
+            required
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            max={4}
+            placeholder="Bisherige Sitzungen"
+            value={form.doneSessions}
+            onChange={e => setForm({ ...form, doneSessions: e.target.value })}
+            required
+          />
         </div>
         {user.role === "admin" && (
-          <input className="w-full p-3 rounded bg-gray-900 text-white" placeholder="Tätowierer (z.B. bacon)"
-            value={form.tattooist} onChange={e => setForm({ ...form, tattooist: e.target.value })} required />
+          <input
+            className="w-full p-3 rounded bg-gray-900 text-white"
+            placeholder="Tätowierer (z.B. bacon)"
+            value={form.tattooist}
+            onChange={e => setForm({ ...form, tattooist: e.target.value })}
+            required
+          />
         )}
-        {editCustomer && (
-          <input className="w-full p-3 rounded bg-gray-900 text-white" type="date" placeholder="Letzte Session (Datum)"
-            value={form.lastSessionDate || ""} onChange={e => setForm({ ...form, lastSessionDate: e.target.value })} />
-        )}
-        <button type="submit" className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold">
+        <button
+          type="submit"
+          className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
+        >
           {editCustomer ? "Ändern" : "Speichern"}
         </button>
         {editCustomer && (
-          <button type="button" onClick={() => { setEditCustomer(null); setForm({
-            name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0,
-            tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
-            className="ml-3 text-gray-400 underline">Abbrechen</button>
+          <button
+            type="button"
+            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            className="ml-3 text-gray-400 underline"
+          >
+            Abbrechen
+          </button>
         )}
       </form>
-      <div className="overflow-x-auto rounded-2xl shadow-lg mb-8">
+
+      {/* Kundenliste */}
+      <div className="overflow-x-auto rounded-2xl shadow-lg">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
-        ) : aktiveKunden.length === 0 ? (
+        ) : customers.length === 0 ? (
           <div className="text-center py-8 text-gray-400">Noch keine Kunden.</div>
         ) : (
           <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
@@ -239,8 +270,8 @@ export default function Customers({ user }) {
               </tr>
             </thead>
             <tbody>
-              {aktiveKunden.map(c => (
-                <tr key={c.id} className={`hover:bg-[#18181b] transition ${isHighlight(c) ? "bg-green-950" : ""}`}>
+              {customers.map(c => (
+                <tr key={c.id} className="hover:bg-[#18181b] transition">
                   <td className="py-4 px-4">{c.name}</td>
                   <td className="py-4 px-4">{c.phone}</td>
                   <td className="py-4 px-4">{c.tattooist}</td>
@@ -250,14 +281,26 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.doneSessions}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
-                    <button className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
-                      onClick={() => toggleArchive(c)}>
+                    <button
+                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}
+                    >
                       {c.isArchived ? "Archiviert" : "Aktiv"}
                     </button>
                   </td>
                   <td className="py-4 px-4">
-                    <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
-                    <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
+                    <button
+                      className="text-blue-400 font-bold px-2"
+                      onClick={() => handleEdit(c)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="text-red-400 font-bold px-2"
+                      onClick={() => deleteCustomer(c.id)}
+                    >
+                      🗑
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -265,54 +308,6 @@ export default function Customers({ user }) {
           </table>
         )}
       </div>
-      {/* Fertige/Archivierte Kunden */}
-      {fertigeKunden.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold mb-2">Fertige Kunden</h2>
-          <div className="overflow-x-auto rounded-2xl shadow-lg">
-            <table className="w-full bg-[#18181b] text-white rounded-2xl overflow-hidden">
-              <thead>
-                <tr className="text-gray-400 text-base border-b border-gray-800">
-                  <th className="py-4 px-4 text-left font-semibold">Name</th>
-                  <th className="py-4 px-4 text-left font-semibold">Telefon</th>
-                  <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
-                  <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
-                  <th className="py-4 px-4 text-left font-semibold">Stelle</th>
-                  <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
-                  <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
-                  <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
-                  <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
-                  <th className="py-4 px-4"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fertigeKunden.map(c => (
-                  <tr key={c.id}>
-                    <td className="py-4 px-4">{c.name}</td>
-                    <td className="py-4 px-4">{c.phone}</td>
-                    <td className="py-4 px-4">{c.tattooist}</td>
-                    <td className="py-4 px-4">{c.tattooName}</td>
-                    <td className="py-4 px-4">{c.placement}</td>
-                    <td className="py-4 px-4">{c.sessions}</td>
-                    <td className="py-4 px-4">{c.doneSessions}</td>
-                    <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
-                    <td className="py-4 px-4">
-                      <button className="text-xs px-2 py-1 rounded-full bg-yellow-700 text-white"
-                        onClick={() => toggleArchive(c)}>
-                        Archiviert
-                      </button>
-                    </td>
-                    <td className="py-4 px-4">
-                      <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
-                      <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
