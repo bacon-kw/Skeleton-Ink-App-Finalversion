@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+// Optional: import { v4 as uuidv4 } from "uuid"; (für individuelle Rechnungen)
 
 export default function Invoices({ user }) {
   const [invoices, setInvoices] = useState([]);
@@ -54,9 +55,12 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
     }
   }
 
+  // Hier könntest du einen Button + Modal für individuelle Rechnungen einbauen
+
   return (
     <div className="max-w-6xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Rechnungen</h1>
+      {/* Optional: Button "Rechnung hinzufügen" für individuelle Rechnungen */}
       {loading ? (
         <div className="text-center py-8 text-gray-400">Lade Rechnungen...</div>
       ) : invoices.length === 0 ? (
@@ -98,7 +102,6 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
                   )}
                 </td>
                 <td className="py-4 px-4 flex flex-col gap-2">
-                  {/* Rechnungstext-Block mit Kopieren-Button */}
                   <pre
                     className="bg-gray-900 text-xs p-2 rounded mb-2 whitespace-pre-line break-words"
                     style={{ maxWidth: 250, fontFamily: "inherit" }}
@@ -109,7 +112,6 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
                   >
                     Kopieren
                   </button>
-                  {/* Löschen nur für Admin */}
                   {user.role === "admin" && (
                     <button
                       className="bg-red-700 hover:bg-red-800 text-white text-xs rounded px-3 py-1"
