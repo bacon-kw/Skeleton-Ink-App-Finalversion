@@ -34,8 +34,9 @@ export default function UserManagement({ user }) {
         .eq("id", editUser.id);
       setEditUser(null);
     } else {
-      // Bestimme den maximalen aktuellen "order"-Wert:
-      const maxOrder = users.length > 0 ? Math.max(...users.map(u => u.order || 0)) : 0;
+      // Bestimme den maximalen aktuellen "order"-Wert für Tätowierer:
+      const tattooists = users.filter(u => u.role === "tattooist");
+      const maxOrder = tattooists.length > 0 ? Math.max(...tattooists.map(u => u.order || 0)) : 0;
       await supabase.from("users").insert([
         {
           id: uuidv4(),
@@ -64,9 +65,10 @@ export default function UserManagement({ user }) {
     loadUsers();
   }
 
-  // TÄTOWIERER-SORTIERUNG (Up/Down)
-  async function moveUser(userId, direction) {
-    const tattooists = users.filter(u => u.role === "tattooist");
+  // Robuste Tätowierer-Sortierung (nur unter den Tätowierern!)
+  async function moveTattooist(userId, direction) {
+    // Filtere Tätowierer sortiert nach 'order'
+    const tattooists = users.filter(u => u.role === "tattooist").sort((a, b) => a.order - b.order);
     const index = tattooists.findIndex(u => u.id === userId);
     if (
       (direction === "up" && index === 0) ||
@@ -74,14 +76,24 @@ export default function UserManagement({ user }) {
     )
       return;
     const newIndex = direction === "up" ? index - 1 : index + 1;
-    const userA = tattooists[index];
-    const userB = tattooists[newIndex];
+    const current = tattooists[index];
+    const swapWith = tattooists[newIndex];
 
-    // Vertausche deren "order"-Werte in der Datenbank
-    await supabase.from("users").update({ order: userB.order }).eq("id", userA.id);
-    await supabase.from("users").update({ order: userA.order }).eq("id", userB.id);
+    // Vertausche deren "order"-Werte
+    await supabase.from("users").update({ order: swapWith.order }).eq("id", current.id);
+    await supabase.from("users").update({ order: current.order }).eq("id", swapWith.id);
 
-    loadUsers();
+    await loadUsers();
+  }
+
+  // Hilfsfunktion: Finde Position unter den Tätowierern
+  function tattooistPos(id) {
+    const tattooists = users.filter(u => u.role === "tattooist").sort((a, b) => a.order - b.order);
+    return tattooists.findIndex(u => u.id === id);
+  }
+
+  function tattooistCount() {
+    return users.filter(u => u.role === "tattooist").length;
   }
 
   return (
@@ -160,7 +172,9 @@ export default function UserManagement({ user }) {
           </tr>
         </thead>
         <tbody>
-          {users.map((u, i, arr) => (
+          {users
+            .sort((a, b) => a.order - b.order)
+            .map(u => (
             <tr key={u.id} className="hover:bg-[#18181b] transition">
               <td className="py-4 px-4">{u.username}</td>
               <td className="py-4 px-4">{u.role}</td>
@@ -170,21 +184,16 @@ export default function UserManagement({ user }) {
                   <>
                     <button
                       className="mr-2 bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
-                      disabled={
-                        users.filter(x => x.role === "tattooist").findIndex(x => x.id === u.id) === 0
-                      }
-                      onClick={() => moveUser(u.id, "up")}
+                      disabled={tattooistPos(u.id) === 0}
+                      onClick={() => moveTattooist(u.id, "up")}
                       title="Nach oben"
                     >
                       ⬆️
                     </button>
                     <button
                       className="bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
-                      disabled={
-                        users.filter(x => x.role === "tattooist").findIndex(x => x.id === u.id) ===
-                        users.filter(x => x.role === "tattooist").length - 1
-                      }
-                      onClick={() => moveUser(u.id, "down")}
+                      disabled={tattooistPos(u.id) === tattooistCount() - 1}
+                      onClick={() => moveTattooist(u.id, "down")}
                       title="Nach unten"
                     >
                       ⬇️
