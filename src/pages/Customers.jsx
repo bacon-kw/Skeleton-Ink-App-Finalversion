@@ -25,12 +25,22 @@ export default function Customers({ user }) {
 
   async function loadCustomers() {
     setLoading(true);
-    let query = supabase.from("customers").select("*").order("date", { ascending: false });
+    let query = supabase.from("customers").select("*");
     if (user.role !== "admin") {
       query = query.eq("tattooist", user.username);
     }
     const { data, error } = await query;
-    if (!error) setCustomers(data);
+    if (!error) {
+      // Archivierte ans Ende!
+      data.sort((a, b) => {
+        if (a.isArchived === b.isArchived) {
+          // Optional: Sortiere aktive nach neuem Datum zuerst
+          return new Date(b.date || b.created_at) - new Date(a.date || a.created_at);
+        }
+        return a.isArchived ? 1 : -1;
+      });
+      setCustomers(data);
+    }
     setLoading(false);
   }
 
@@ -57,7 +67,7 @@ export default function Customers({ user }) {
   }
 
   async function createInvoiceForCustomer(customer) {
-    // Falls schon eine Rechnung für diesen Kunden existiert: NICHT nochmal!
+    // Erstelle nur eine Rechnung, falls noch keine existiert:
     const { data: existing } = await supabase
       .from("invoices")
       .select("id")
@@ -125,7 +135,8 @@ export default function Customers({ user }) {
       }
     } else {
       const now = new Date();
-      const { data, error } = await supabase.from("customers").insert([{
+      // Nutze .select("*").single() um die ID des Kunden direkt zurück zu bekommen!
+      const { data: inserted, error } = await supabase.from("customers").insert([{
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
@@ -133,9 +144,8 @@ export default function Customers({ user }) {
         isArchived: false,
         lastSessionDate: now
       }]).select("*").single();
-      if (!error && data) {
-        // Jetzt garantiert: data enthält die ID!
-        await createInvoiceForCustomer(data);
+      if (!error && inserted) {
+        await createInvoiceForCustomer(inserted);
         setForm({
           name: "",
           phone: "",
@@ -175,59 +185,6 @@ export default function Customers({ user }) {
     const now = new Date();
     const days = (now - last) / (1000 * 60 * 60 * 24);
     return days >= 2 && c.doneSessions < c.sessions && !c.isArchived;
-  }
-
-  const aktiveKunden = customers.filter(c => !c.isArchived);
-  const fertigeKunden = customers.filter(c => c.isArchived);
-
-  function KundenTabelle({ kunden, headline }) {
-    return (
-      <>
-        <h2 className="text-2xl font-bold mb-3">{headline}</h2>
-        <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden mb-8">
-          <thead>
-            <tr className="text-gray-400 text-base border-b border-gray-800">
-              <th className="py-4 px-4 text-left font-semibold">Name</th>
-              <th className="py-4 px-4 text-left font-semibold">Telefon</th>
-              <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
-              <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
-              <th className="py-4 px-4 text-left font-semibold">Stelle</th>
-              <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
-              <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
-              <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
-              <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
-              <th className="py-4 px-4"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {kunden.map(c => (
-              <tr key={c.id} className={`transition ${isHighlight(c) ? "bg-green-950" : "hover:bg-[#18181b]"}`}>
-                <td className="py-4 px-4">{c.name}</td>
-                <td className="py-4 px-4">{c.phone}</td>
-                <td className="py-4 px-4">{c.tattooist}</td>
-                <td className="py-4 px-4">{c.tattooName}</td>
-                <td className="py-4 px-4">{c.placement}</td>
-                <td className="py-4 px-4">{c.sessions}</td>
-                <td className="py-4 px-4">{c.doneSessions}</td>
-                <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
-                <td className="py-4 px-4">
-                  <button
-                    className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
-                    onClick={() => toggleArchive(c)}
-                  >
-                    {c.isArchived ? "Archiviert" : "Aktiv"}
-                  </button>
-                </td>
-                <td className="py-4 px-4">
-                  <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
-                  <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </>
-    );
   }
 
   return (
@@ -270,9 +227,56 @@ export default function Customers({ user }) {
             className="ml-3 text-gray-400 underline">Abbrechen</button>
         )}
       </form>
-
-      {aktiveKunden.length > 0 && <KundenTabelle kunden={aktiveKunden} headline="Aktive Kunden" />}
-      {fertigeKunden.length > 0 && <KundenTabelle kunden={fertigeKunden} headline="Fertige Kunden" />}
+      <div className="overflow-x-auto rounded-2xl shadow-lg mb-8">
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
+        ) : customers.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">Noch keine Kunden.</div>
+        ) : (
+          <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
+            <thead>
+              <tr className="text-gray-400 text-base border-b border-gray-800">
+                <th className="py-4 px-4 text-left font-semibold">Name</th>
+                <th className="py-4 px-4 text-left font-semibold">Telefon</th>
+                <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
+                <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
+                <th className="py-4 px-4 text-left font-semibold">Stelle</th>
+                <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
+                <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
+                <th className="py-4 px-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map(c => (
+                <tr key={c.id} className={`transition ${isHighlight(c) ? "bg-green-950" : "hover:bg-[#18181b]"} ${c.isArchived ? "opacity-70" : ""}`}>
+                  <td className="py-4 px-4">{c.name}</td>
+                  <td className="py-4 px-4">{c.phone}</td>
+                  <td className="py-4 px-4">{c.tattooist}</td>
+                  <td className="py-4 px-4">{c.tattooName}</td>
+                  <td className="py-4 px-4">{c.placement}</td>
+                  <td className="py-4 px-4">{c.sessions}</td>
+                  <td className="py-4 px-4">{c.doneSessions}</td>
+                  <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                  <td className="py-4 px-4">
+                    <button
+                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}
+                    >
+                      {c.isArchived ? "Archiviert" : "Aktiv"}
+                    </button>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
+                    <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
