@@ -13,7 +13,7 @@ export default function Invoices({ user }) {
   async function loadInvoices() {
     setLoading(true);
     let query = supabase.from("invoices").select("*").order("date", { ascending: false });
-    if (user.role !== "admin") {
+    if (user.role === "tattooist") {
       query = query.eq("tattooist", user.username);
     }
     const { data, error } = await query;
@@ -34,7 +34,7 @@ export default function Invoices({ user }) {
   }
 
   function invoiceText(inv) {
-    return `💀 Skeleton Ink Rechnung
+    return `🌙 Midnight Tattoo Rechnung
 Rechnungsnummer: ${inv.invoiceNumber}
 Datum: ${formatDate(inv.date)}
 Tätowierer: ${inv.tattooist}
@@ -72,6 +72,8 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
               <th className="py-4 px-4 text-left font-semibold">Tattoo (Stelle)</th>
               <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
               <th className="py-4 px-4 text-left font-semibold">Betrag ($)</th>
+              <th className="py-4 px-4 text-left font-semibold">Lohn</th>
+              <th className="py-4 px-4 text-left font-semibold">Ausgezahlt</th>
               <th className="py-4 px-4"></th>
             </tr>
           </thead>
@@ -82,10 +84,21 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
                 <td className="py-4 px-4">{formatDate(inv.date)}</td>
                 <td className="py-4 px-4">{inv.tattooist}</td>
                 <td className="py-4 px-4">{inv.customerName}</td>
-                <td className="py-4 px-4">{inv.placement} ({inv.tattooName})</td>
+                <td className="py-4 px-4">
+                  {inv.placement} ({inv.tattooName})
+                </td>
                 <td className="py-4 px-4">{inv.sessions}</td>
                 <td className="py-4 px-4">{Number(inv.amount).toLocaleString("de-DE")} $</td>
+                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} $` : ""}</td>
+                <td className="py-4 px-4">
+                  {inv.payoutDone ? (
+                    <span className="bg-green-900 text-green-400 px-2 py-1 rounded text-xs">JA</span>
+                  ) : (
+                    <span className="bg-yellow-900 text-yellow-400 px-2 py-1 rounded text-xs">NEIN</span>
+                  )}
+                </td>
                 <td className="py-4 px-4 flex flex-col gap-2">
+                  {/* Rechnungstext-Block mit Kopieren-Button */}
                   <pre
                     className="bg-gray-900 text-xs p-2 rounded mb-2 whitespace-pre-line break-words"
                     style={{ maxWidth: 250, fontFamily: "inherit" }}
@@ -96,6 +109,7 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
                   >
                     Kopieren
                   </button>
+                  {/* Löschen nur für Admin */}
                   {user.role === "admin" && (
                     <button
                       className="bg-red-700 hover:bg-red-800 text-white text-xs rounded px-3 py-1"
