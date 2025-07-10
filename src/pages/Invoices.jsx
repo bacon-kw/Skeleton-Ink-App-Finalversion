@@ -38,7 +38,11 @@ export default function Invoices({ user }) {
       "Stelle",
       "Sitzungen",
       "Betrag",
-      "Steuer"
+      "Steuer",
+      "Rabatt",
+      "Custom-Betrag",
+      "Materialkosten",
+      "Tätowiererlohn"
     ].join(";");
     const rows = invoices.map(inv =>
       [
@@ -50,7 +54,11 @@ export default function Invoices({ user }) {
         inv.placement,
         inv.sessions,
         inv.amount,
-        inv.tax
+        inv.tax,
+        inv.discount || "",
+        inv.customAmount || "",
+        inv.materialCosts || 500,
+        inv.tattooistWage || ""
       ].join(";")
     );
     const csvContent = [header, ...rows].join("\n");
@@ -70,7 +78,7 @@ export default function Invoices({ user }) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 text-white">
+    <div className="max-w-6xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Rechnungen</h1>
       {user.role === "admin" && (
         <button
@@ -95,6 +103,10 @@ export default function Invoices({ user }) {
               <th className="py-4 px-4 text-left font-semibold">Tattoo (Stelle)</th>
               <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
               <th className="py-4 px-4 text-left font-semibold">Betrag (€)</th>
+              <th className="py-4 px-4 text-left font-semibold">Rabatt</th>
+              <th className="py-4 px-4 text-left font-semibold">Custom</th>
+              <th className="py-4 px-4 text-left font-semibold">Material</th>
+              <th className="py-4 px-4 text-left font-semibold">Lohn</th>
               <th className="py-4 px-4"></th>
             </tr>
           </thead>
@@ -110,12 +122,16 @@ export default function Invoices({ user }) {
                 </td>
                 <td className="py-4 px-4">{inv.sessions}</td>
                 <td className="py-4 px-4">{Number(inv.amount).toLocaleString("de-DE")} €</td>
+                <td className="py-4 px-4">{inv.discount ? `${inv.discount} $` : ""}</td>
+                <td className="py-4 px-4">{inv.customAmount ? `${inv.customAmount} $` : ""}</td>
+                <td className="py-4 px-4">{inv.materialCosts ? `${inv.materialCosts} $` : "500 $"}</td>
+                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} $` : ""}</td>
                 <td className="py-4 px-4 flex gap-2">
                   {/* Kopieren-Button */}
                   <button
                     className="bg-gray-700 hover:bg-gray-800 text-white text-xs rounded px-3 py-1"
                     onClick={() => {
-                      const text = `💀 Skeleton Ink Rechnung\nRechnungsnummer: ${inv.invoiceNumber}\nDatum: ${formatDate(inv.date)}\nTätowierer: ${inv.tattooist}\nKunde: ${inv.customerName}\nTattoo: ${inv.placement} (${inv.tattooName})\nSitzungen: ${inv.sessions}\nRechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString("de-DE")} €`;
+                      const text = `🌙 Midnight Tattoo Rechnung\nRechnungsnummer: ${inv.invoiceNumber}\nDatum: ${formatDate(inv.date)}\nTätowierer: ${inv.tattooist}\nKunde: ${inv.customerName}\nTattoo: ${inv.placement} (${inv.tattooName})\nSitzungen: ${inv.sessions}\nRabatt: ${inv.discount ? inv.discount + " $" : "-"}\nCustom-Betrag: ${inv.customAmount ? inv.customAmount + " $" : "-"}\nMaterialkosten: ${inv.materialCosts ? inv.materialCosts + " $" : "500 $"}\nTätowiererlohn: ${inv.tattooistWage ? inv.tattooistWage + " $" : "-"}\nRechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString("de-DE")} €`;
                       navigator.clipboard.writeText(text);
                     }}
                   >
