@@ -57,7 +57,7 @@ export default function Customers({ user }) {
   }
 
   async function createInvoiceForCustomer(customer) {
-    // Prüfe, ob bereits eine Rechnung existiert (per customerId)
+    // Prüfe, ob bereits eine Rechnung für diesen Kunden existiert
     const { data: existing } = await supabase
       .from("invoices")
       .select("id")
@@ -136,7 +136,7 @@ export default function Customers({ user }) {
         lastSessionDate: now
       }]);
       if (!error) {
-        // Automatisch Rechnung erstellen
+        // NUR beim Anlegen wird die Rechnung erzeugt!
         const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
         await createInvoiceForCustomer(customerObj);
 
@@ -173,7 +173,7 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  // Hilfsfunktion: grünlicher Hintergrund, wenn letzte Session ≥2 Tage her UND noch Sessions offen
+  // Highlight, wenn letzte Session ≥2 Tage her und noch Sitzungen offen
   function isHighlight(c) {
     if (!c.lastSessionDate) return false;
     const last = new Date(c.lastSessionDate);
@@ -182,119 +182,49 @@ export default function Customers({ user }) {
     return days >= 2 && c.doneSessions < c.sessions && !c.isArchived;
   }
 
-  // Kunden nach archiviert/nicht-archiviert trennen
   const aktiveKunden = customers.filter(c => !c.isArchived);
   const fertigeKunden = customers.filter(c => c.isArchived);
 
   return (
     <div className="max-w-5xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
-      {/* Kundenformular */}
       <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
         <div className="flex flex-wrap gap-3">
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            placeholder="Name"
-            value={form.name}
-            onChange={e => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            placeholder="Telefon"
-            value={form.phone}
-            onChange={e => setForm({ ...form, phone: e.target.value })}
-            required
-          />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Name"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Telefon"
+            value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
         </div>
         <div className="flex flex-wrap gap-3">
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            placeholder="Tattoo"
-            value={form.tattooName}
-            onChange={e => setForm({ ...form, tattooName: e.target.value })}
-            required
-          />
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            placeholder="Tattoo-Stelle"
-            value={form.placement}
-            onChange={e => setForm({ ...form, placement: e.target.value })}
-            required
-          />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo"
+            value={form.tattooName} onChange={e => setForm({ ...form, tattooName: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo-Stelle"
+            value={form.placement} onChange={e => setForm({ ...form, placement: e.target.value })} required />
         </div>
         <div className="flex flex-wrap gap-3">
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            type="number"
-            min={1}
-            max={4}
-            placeholder="Sitzungen"
-            value={form.sessions}
-            onChange={e => setForm({ ...form, sessions: e.target.value })}
-            required
-          />
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            type="number"
-            min={0}
-            max={4}
-            placeholder="Bisherige Sitzungen"
-            value={form.doneSessions}
-            onChange={e => setForm({ ...form, doneSessions: e.target.value })}
-            required
-          />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={1} max={4} placeholder="Sitzungen"
+            value={form.sessions} onChange={e => setForm({ ...form, sessions: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={0} max={4} placeholder="Bisherige Sitzungen"
+            value={form.doneSessions} onChange={e => setForm({ ...form, doneSessions: e.target.value })} required />
         </div>
         {user.role === "admin" && (
-          <input
-            className="w-full p-3 rounded bg-gray-900 text-white"
-            placeholder="Tätowierer (z.B. bacon)"
-            value={form.tattooist}
-            onChange={e => setForm({ ...form, tattooist: e.target.value })}
-            required
-          />
+          <input className="w-full p-3 rounded bg-gray-900 text-white" placeholder="Tätowierer (z.B. bacon)"
+            value={form.tattooist} onChange={e => setForm({ ...form, tattooist: e.target.value })} required />
         )}
-        {/* Bearbeiten: Datum letzte Session */}
         {editCustomer && (
-          <input
-            className="w-full p-3 rounded bg-gray-900 text-white"
-            type="date"
-            placeholder="Letzte Session (Datum)"
-            value={form.lastSessionDate || ""}
-            onChange={e => setForm({ ...form, lastSessionDate: e.target.value })}
-          />
+          <input className="w-full p-3 rounded bg-gray-900 text-white" type="date" placeholder="Letzte Session (Datum)"
+            value={form.lastSessionDate || ""} onChange={e => setForm({ ...form, lastSessionDate: e.target.value })} />
         )}
-        <button
-          type="submit"
-          className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
-        >
+        <button type="submit" className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold">
           {editCustomer ? "Ändern" : "Speichern"}
         </button>
         {editCustomer && (
-          <button
-            type="button"
-            onClick={() => {
-              setEditCustomer(null);
-              setForm({
-                name: "",
-                phone: "",
-                placement: "",
-                tattooName: "",
-                sessions: 1,
-                doneSessions: 0,
-                tattooist: user.role === "admin" ? "" : user.username,
-                isArchived: false,
-                lastSessionDate: null
-              });
-            }}
-            className="ml-3 text-gray-400 underline"
-          >
-            Abbrechen
-          </button>
+          <button type="button" onClick={() => { setEditCustomer(null); setForm({
+            name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0,
+            tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            className="ml-3 text-gray-400 underline">Abbrechen</button>
         )}
       </form>
-
-      {/* Kundenliste */}
       <div className="overflow-x-auto rounded-2xl shadow-lg mb-8">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
@@ -318,10 +248,7 @@ export default function Customers({ user }) {
             </thead>
             <tbody>
               {aktiveKunden.map(c => (
-                <tr
-                  key={c.id}
-                  className={`hover:bg-[#18181b] transition ${isHighlight(c) ? "bg-green-950" : ""}`}
-                >
+                <tr key={c.id} className={`hover:bg-[#18181b] transition ${isHighlight(c) ? "bg-green-950" : ""}`}>
                   <td className="py-4 px-4">{c.name}</td>
                   <td className="py-4 px-4">{c.phone}</td>
                   <td className="py-4 px-4">{c.tattooist}</td>
@@ -331,26 +258,14 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.doneSessions}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
-                    <button
-                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
-                      onClick={() => toggleArchive(c)}
-                    >
+                    <button className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}>
                       {c.isArchived ? "Archiviert" : "Aktiv"}
                     </button>
                   </td>
                   <td className="py-4 px-4">
-                    <button
-                      className="text-blue-400 font-bold px-2"
-                      onClick={() => handleEdit(c)}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="text-red-400 font-bold px-2"
-                      onClick={() => deleteCustomer(c.id)}
-                    >
-                      🗑
-                    </button>
+                    <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
+                    <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
                   </td>
                 </tr>
               ))}
@@ -358,7 +273,6 @@ export default function Customers({ user }) {
           </table>
         )}
       </div>
-
       {/* Fertige/Archivierte Kunden */}
       {fertigeKunden.length > 0 && (
         <div>
@@ -391,26 +305,14 @@ export default function Customers({ user }) {
                     <td className="py-4 px-4">{c.doneSessions}</td>
                     <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                     <td className="py-4 px-4">
-                      <button
-                        className={`text-xs px-2 py-1 rounded-full bg-yellow-700 text-white`}
-                        onClick={() => toggleArchive(c)}
-                      >
+                      <button className="text-xs px-2 py-1 rounded-full bg-yellow-700 text-white"
+                        onClick={() => toggleArchive(c)}>
                         Archiviert
                       </button>
                     </td>
                     <td className="py-4 px-4">
-                      <button
-                        className="text-blue-400 font-bold px-2"
-                        onClick={() => handleEdit(c)}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="text-red-400 font-bold px-2"
-                        onClick={() => deleteCustomer(c.id)}
-                      >
-                        🗑
-                      </button>
+                      <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
+                      <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
                     </td>
                   </tr>
                 ))}
