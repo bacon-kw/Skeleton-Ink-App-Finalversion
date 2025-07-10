@@ -18,6 +18,12 @@ export default function Invoices({ user }) {
     setInvoices(data || []);
   }
 
+  async function deleteInvoice(id) {
+    if (!window.confirm("Diese Rechnung wirklich löschen?")) return;
+    await supabase.from("invoices").delete().eq("id", id);
+    load();
+  }
+
   function formatCurrency(n) {
     return Number(n).toLocaleString("de-DE") + " €";
   }
@@ -39,6 +45,9 @@ export default function Invoices({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Betrag</th>
+                {user.role === "admin" && (
+                  <th className="py-4 px-4"></th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -51,6 +60,11 @@ export default function Invoices({ user }) {
                   <td className="py-4 px-4">{i.tattooName}</td>
                   <td className="py-4 px-4">{i.sessions}</td>
                   <td className="py-4 px-4">{formatCurrency(i.amount)}</td>
+                  {user.role === "admin" && (
+                    <td className="py-4 px-4">
+                      <button className="text-red-400 font-bold px-2" onClick={() => deleteInvoice(i.id)}>🗑</button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
