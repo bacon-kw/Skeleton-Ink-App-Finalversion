@@ -17,7 +17,7 @@ export default function Dashboard({ user }) {
   async function loadData() {
     setLoading(true);
 
-    // Lade alle Tätowierer (nur zum Zählen)
+    // Tätowierer laden
     const { data: users } = await supabase
       .from("users")
       .select("username")
@@ -118,6 +118,14 @@ export default function Dashboard({ user }) {
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Tättowierer sehen aktuelle Steuer als Anzeige */}
+          {user.role === "tattooist" && (
+            <div className="mb-8 flex items-center gap-3">
+              <span className="text-lg font-semibold">Steuersatz:</span>
+              <span className="bg-gray-900 p-2 rounded text-white">{tax} %</span>
             </div>
           )}
 
