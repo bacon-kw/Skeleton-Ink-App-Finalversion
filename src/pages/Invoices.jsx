@@ -33,6 +33,27 @@ export default function Invoices({ user }) {
     loadInvoices();
   }
 
+  function invoiceText(inv) {
+    return `💀 Skeleton Ink Rechnung
+Rechnungsnummer: ${inv.invoiceNumber}
+Datum: ${formatDate(inv.date)}
+Tätowierer: ${inv.tattooist}
+Kunde: ${inv.customerName}
+Tattoo: ${inv.placement} (${inv.tattooName})
+Sitzungen: ${inv.sessions}
+
+Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString("de-DE")} €`;
+  }
+
+  async function copyInvoiceText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Rechnungstext kopiert!");
+    } catch (err) {
+      alert("Kopieren fehlgeschlagen: " + err);
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Rechnungen</h1>
@@ -68,7 +89,7 @@ export default function Invoices({ user }) {
                 </td>
                 <td className="py-4 px-4">{inv.sessions}</td>
                 <td className="py-4 px-4">{Number(inv.amount).toLocaleString("de-DE")} €</td>
-                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} $` : ""}</td>
+                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} €` : ""}</td>
                 <td className="py-4 px-4">
                   {inv.payoutDone ? (
                     <span className="bg-green-900 text-green-400 px-2 py-1 rounded text-xs">JA</span>
@@ -76,7 +97,18 @@ export default function Invoices({ user }) {
                     <span className="bg-yellow-900 text-yellow-400 px-2 py-1 rounded text-xs">NEIN</span>
                   )}
                 </td>
-                <td className="py-4 px-4 flex gap-2">
+                <td className="py-4 px-4 flex flex-col gap-2">
+                  {/* Rechnungstext-Block mit Kopieren-Button */}
+                  <pre
+                    className="bg-gray-900 text-xs p-2 rounded mb-2 whitespace-pre-line break-words"
+                    style={{ maxWidth: 250, fontFamily: "inherit" }}
+                  >{invoiceText(inv)}</pre>
+                  <button
+                    onClick={() => copyInvoiceText(invoiceText(inv))}
+                    className="bg-pink-700 hover:bg-pink-800 text-white text-xs rounded px-3 py-1"
+                  >
+                    Kopieren
+                  </button>
                   {/* Löschen nur für Admin */}
                   {user.role === "admin" && (
                     <button
