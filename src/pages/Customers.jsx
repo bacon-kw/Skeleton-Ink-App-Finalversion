@@ -15,7 +15,7 @@ export default function Customers({ user }) {
     doneSessions: 0,
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
-    lastSessionDate: null,
+    lastSessionDate: null
   });
 
   useEffect(() => {
@@ -45,27 +45,16 @@ export default function Customers({ user }) {
       doneSessions: customer.doneSessions,
       tattooist: customer.tattooist,
       isArchived: customer.isArchived,
-      lastSessionDate: customer.lastSessionDate,
+      lastSessionDate: customer.lastSessionDate
     });
   }
 
-  // Hilfsfunktion um den aktuellen Steuersatz zu laden
   async function getTax() {
     const { data } = await supabase.from("settings").select("value").eq("key", "tax").single();
     return data && data.value ? Number(data.value) : 19;
   }
 
-  // Automatische Rechnungserstellung für neuen Kunden
   async function createInvoiceForCustomer(customer) {
-    // Verhindere doppelte Rechnungen für denselben Kunden
-    const { data: existingInvoices } = await supabase
-      .from("invoices")
-      .select("id")
-      .eq("customerId", customer.id);
-
-    if (existingInvoices && existingInvoices.length > 0) return;
-
-    // Zähle Rechnungen dieses Jahres, um Rechnungsnummer zu generieren
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
       .from("invoices")
@@ -74,11 +63,13 @@ export default function Customers({ user }) {
       .lte("date", `${year}-12-31`);
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
-
     const tax = await getTax();
-    const sessions = customer.sessions;
+    const sessions = Number(customer.sessions);
+
     const amountNet = sessions * 1500;
-    const amount = Math.round(amountNet * (1 + tax / 100));
+    const materialCosts = sessions * 500;
+    const tattooistWage = sessions * 1000;
+    const finalAmount = Math.round(amountNet * (1 + tax / 100));
 
     await supabase.from("invoices").insert([{
       id: uuidv4(),
@@ -89,9 +80,12 @@ export default function Customers({ user }) {
       tattooName: customer.tattooName,
       placement: customer.placement,
       sessions,
-      amount,
+      amount: finalAmount,
       tax,
-      customerId: customer.id
+      customerId: customer.id,
+      materialCosts: materialCosts,
+      tattooistWage: tattooistWage,
+      payoutDone: false
     }]);
   }
 
@@ -99,12 +93,11 @@ export default function Customers({ user }) {
     e.preventDefault();
     const now = new Date();
     if (editCustomer) {
-      // Beim Ändern wird KEINE Rechnung erstellt!
       const { error } = await supabase.from("customers").update({
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
-        lastSessionDate: now // update bei Änderung
+        lastSessionDate: now
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -117,7 +110,7 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null,
+          lastSessionDate: null
         });
         loadCustomers();
       }
@@ -130,11 +123,10 @@ export default function Customers({ user }) {
         doneSessions: parseInt(form.doneSessions),
         date: now,
         isArchived: false,
-        lastSessionDate: now,
+        lastSessionDate: now
       }]);
       if (!error) {
-        // Nur beim Anlegen wird die Rechnung erstellt!
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions) };
+        const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
         await createInvoiceForCustomer(customerObj);
 
         setForm({
@@ -146,7 +138,7 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null,
+          lastSessionDate: null
         });
         loadCustomers();
       }
