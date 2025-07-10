@@ -2,157 +2,300 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
-export default function UserManagement({ user }) {
-  const [users, setUsers] = useState([]);
-  const [editUser, setEditUser] = useState(null);
+export default function Customers({ user }) {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editCustomer, setEditCustomer] = useState(null);
   const [form, setForm] = useState({
-    username: "",
-    password: "",
-    role: "tattooist",
-    color: "gray"
+    name: "",
+    phone: "",
+    placement: "",
+    tattooName: "",
+    sessions: 1,
+    doneSessions: 0,
+    tattooist: user.role === "admin" ? "" : user.username,
+    isArchived: false,
+    lastSessionDate: null,
+    customAmount: "",
+    discount: ""
   });
 
   useEffect(() => {
-    loadUsers();
+    loadCustomers();
     // eslint-disable-next-line
   }, []);
 
-  async function loadUsers() {
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .order("order", { ascending: true });
-    setUsers(data || []);
-  }
-
-  async function saveUser(e) {
-    e.preventDefault();
-    if (editUser) {
-      await supabase
-        .from("users")
-        .update({ ...form })
-        .eq("id", editUser.id);
-      setEditUser(null);
-    } else {
-      // Bestimme den maximalen aktuellen "order"-Wert für Tätowierer:
-      const tattooists = users.filter(u => u.role === "tattooist");
-      const maxOrder = tattooists.length > 0 ? Math.max(...tattooists.map(u => u.order || 0)) : 0;
-      await supabase.from("users").insert([
-        {
-          id: uuidv4(),
-          ...form,
-          order: maxOrder + 1
-        }
-      ]);
+  async function loadCustomers() {
+    setLoading(true);
+    let query = supabase.from("customers").select("*").order("date", { ascending: false });
+    if (user.role !== "admin") {
+      query = query.eq("tattooist", user.username);
     }
-    setForm({ username: "", password: "", role: "tattooist", color: "gray" });
-    loadUsers();
+    const { data, error } = await query;
+    if (!error) setCustomers(data);
+    setLoading(false);
   }
 
-  function handleEdit(u) {
-    setEditUser(u);
+  function handleEdit(customer) {
+    setEditCustomer(customer);
     setForm({
-      username: u.username,
-      password: u.password,
-      role: u.role,
-      color: u.color
+      name: customer.name,
+      phone: customer.phone,
+      placement: customer.placement,
+      tattooName: customer.tattooName,
+      sessions: customer.sessions,
+      doneSessions: customer.doneSessions,
+      tattooist: customer.tattooist,
+      isArchived: customer.isArchived,
+      lastSessionDate: customer.lastSessionDate,
+      customAmount: customer.customAmount || "",
+      discount: customer.discount || ""
     });
   }
 
-  async function deleteUser(id) {
-    if (!window.confirm("Benutzer wirklich löschen?")) return;
-    await supabase.from("users").delete().eq("id", id);
-    loadUsers();
+  async function getTax() {
+    const { data } = await supabase.from("settings").select("value").eq("key", "tax").single();
+    return data && data.value ? Number(data.value) : 19;
   }
 
-  // Robuste Tätowierer-Sortierung (nur unter den Tätowierern!)
-  async function moveTattooist(userId, direction) {
-    // Filtere Tätowierer sortiert nach 'order'
-    const tattooists = users.filter(u => u.role === "tattooist").sort((a, b) => a.order - b.order);
-    const index = tattooists.findIndex(u => u.id === userId);
-    if (
-      (direction === "up" && index === 0) ||
-      (direction === "down" && index === tattooists.length - 1)
-    )
-      return;
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    const current = tattooists[index];
-    const swapWith = tattooists[newIndex];
+  async function createInvoiceForCustomer(customer) {
+    // Prüfe, ob schon Rechnung existiert (lösche diese Prüfung!)
+    // Es soll für JEDEN Kunden beim Erstellen immer eine Rechnung angelegt werden!
+    const year = new Date().getFullYear();
+    const { data: yearInvoices } = await supabase
+      .from("invoices")
+      .select("id")
+      .gte("date", `${year}-01-01`)
+      .lte("date", `${year}-12-31`);
+    const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
+    const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
 
-    // Vertausche deren "order"-Werte
-    await supabase.from("users").update({ order: swapWith.order }).eq("id", current.id);
-    await supabase.from("users").update({ order: current.order }).eq("id", swapWith.id);
+    const tax = await getTax();
+    const sessions = Number(customer.sessions);
+    const materialCosts = 500; // immer mindestens 500
+    let usedDiscount = customer.discount ? parseInt(customer.discount) : 0;
 
-    await loadUsers();
+    // Standard-Berechnung
+    let amountNet = sessions * 1500;
+    let tattooistWage = sessions * 1000;
+
+    // Rabatt berücksichtigen (vom Gesamtbetrag abziehen)
+    if (usedDiscount > 0 && usedDiscount < amountNet) {
+      amountNet = amountNet - usedDiscount;
+    }
+
+    let finalAmount;
+    let isCustom = false;
+    let customTattooistWage = null;
+
+    // Custom Amount (inkl. Steuer)
+    if (customer.customAmount && parseInt(customer.customAmount) > 0) {
+      finalAmount = parseInt(customer.customAmount);
+      isCustom = true;
+      // Lohn = Netto(!) - Materialkosten
+      const netto = finalAmount / (1 + tax / 100);
+      customTattooistWage = Math.round(Math.max(netto - materialCosts, 0));
+    } else {
+      finalAmount = Math.round(amountNet * (1 + tax / 100));
+    }
+
+    await supabase.from("invoices").insert([{
+      id: uuidv4(),
+      invoiceNumber,
+      date: new Date(),
+      tattooist: customer.tattooist,
+      customerName: customer.name,
+      tattooName: customer.tattooName,
+      placement: customer.placement,
+      sessions,
+      amount: finalAmount,
+      tax,
+      customerId: customer.id,
+      materialCosts: materialCosts,
+      tattooistWage: isCustom ? customTattooistWage : tattooistWage,
+      isCustom,
+      discount: usedDiscount,
+      customAmount: isCustom ? finalAmount : null
+    }]);
   }
 
-  // Hilfsfunktion: Finde Position unter den Tätowierern
-  function tattooistPos(id) {
-    const tattooists = users.filter(u => u.role === "tattooist").sort((a, b) => a.order - b.order);
-    return tattooists.findIndex(u => u.id === id);
+  async function saveCustomer(e) {
+    e.preventDefault();
+    const now = new Date();
+    if (editCustomer) {
+      const { error } = await supabase.from("customers").update({
+        ...form,
+        sessions: parseInt(form.sessions),
+        doneSessions: parseInt(form.doneSessions),
+        lastSessionDate: now,
+        customAmount: form.customAmount ? parseInt(form.customAmount) : null,
+        discount: form.discount ? parseInt(form.discount) : null
+      }).eq("id", editCustomer.id);
+      if (!error) {
+        setEditCustomer(null);
+        setForm({
+          name: "",
+          phone: "",
+          placement: "",
+          tattooName: "",
+          sessions: 1,
+          doneSessions: 0,
+          tattooist: user.role === "admin" ? "" : user.username,
+          isArchived: false,
+          lastSessionDate: null,
+          customAmount: "",
+          discount: ""
+        });
+        loadCustomers();
+      }
+    } else {
+      const id = uuidv4();
+      const { error } = await supabase.from("customers").insert([{
+        id,
+        ...form,
+        sessions: parseInt(form.sessions),
+        doneSessions: parseInt(form.doneSessions),
+        date: now,
+        isArchived: false,
+        lastSessionDate: now,
+        customAmount: form.customAmount ? parseInt(form.customAmount) : null,
+        discount: form.discount ? parseInt(form.discount) : null
+      }]);
+      if (!error) {
+        const customerObj = { ...form, id, sessions: parseInt(form.sessions), customAmount: form.customAmount, discount: form.discount, tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        await createInvoiceForCustomer(customerObj);
+
+        setForm({
+          name: "",
+          phone: "",
+          placement: "",
+          tattooName: "",
+          sessions: 1,
+          doneSessions: 0,
+          tattooist: user.role === "admin" ? "" : user.username,
+          isArchived: false,
+          lastSessionDate: null,
+          customAmount: "",
+          discount: ""
+        });
+        loadCustomers();
+      }
+    }
   }
 
-  function tattooistCount() {
-    return users.filter(u => u.role === "tattooist").length;
+  async function deleteCustomer(id) {
+    if (!window.confirm("Diesen Kunden wirklich löschen?")) return;
+    await supabase.from("customers").delete().eq("id", id);
+    loadCustomers();
+  }
+
+  async function toggleArchive(customer) {
+    await supabase.from("customers").update({ isArchived: !customer.isArchived }).eq("id", customer.id);
+    loadCustomers();
+  }
+
+  function formatDate(d) {
+    if (!d) return "";
+    const date = new Date(d);
+    return date.toLocaleDateString("de-DE");
   }
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 text-white">
-      <h1 className="text-3xl font-bold mb-6">Benutzerverwaltung</h1>
-
-      {/* Benutzerformular */}
-      <form onSubmit={saveUser} className="bg-gray-800 p-4 rounded-xl mb-8 space-y-3">
-        <div className="flex gap-3">
+    <div className="max-w-5xl mx-auto mt-10 text-white">
+      <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
+      {/* Kundenformular */}
+      <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
+        <div className="flex flex-wrap gap-3">
           <input
             className="flex-1 p-3 rounded bg-gray-900 text-white"
-            placeholder="Benutzername"
-            value={form.username}
-            onChange={e => setForm({ ...form, username: e.target.value })}
+            placeholder="Name"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
             required
           />
           <input
             className="flex-1 p-3 rounded bg-gray-900 text-white"
-            type="password"
-            placeholder="Passwort"
-            value={form.password}
-            onChange={e => setForm({ ...form, password: e.target.value })}
+            placeholder="Telefon"
+            value={form.phone}
+            onChange={e => setForm({ ...form, phone: e.target.value })}
             required
           />
         </div>
-        <div className="flex gap-3">
-          <select
+        <div className="flex flex-wrap gap-3">
+          <input
             className="flex-1 p-3 rounded bg-gray-900 text-white"
-            value={form.role}
-            onChange={e => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="tattooist">Tätowierer</option>
-            <option value="admin">Admin</option>
-          </select>
-          <select
+            placeholder="Tattoo"
+            value={form.tattooName}
+            onChange={e => setForm({ ...form, tattooName: e.target.value })}
+            required
+          />
+          <input
             className="flex-1 p-3 rounded bg-gray-900 text-white"
-            value={form.color}
-            onChange={e => setForm({ ...form, color: e.target.value })}
-          >
-            <option value="gray">Grau</option>
-            <option value="red">Rot</option>
-            <option value="blue">Blau</option>
-            <option value="pink">Pink</option>
-            {/* Weitere Farben nach Bedarf */}
-          </select>
+            placeholder="Tattoo-Stelle"
+            value={form.placement}
+            onChange={e => setForm({ ...form, placement: e.target.value })}
+            required
+          />
         </div>
+        <div className="flex flex-wrap gap-3">
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={1}
+            max={4}
+            placeholder="Sitzungen"
+            value={form.sessions}
+            onChange={e => setForm({ ...form, sessions: e.target.value })}
+            required
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            max={4}
+            placeholder="Bisherige Sitzungen"
+            value={form.doneSessions}
+            onChange={e => setForm({ ...form, doneSessions: e.target.value })}
+            required
+          />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            placeholder="Rabatt ($, optional)"
+            value={form.discount}
+            onChange={e => setForm({ ...form, discount: e.target.value })}
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            placeholder="Individueller Rechnungsbetrag ($, optional)"
+            value={form.customAmount}
+            onChange={e => setForm({ ...form, customAmount: e.target.value })}
+          />
+        </div>
+        {user.role === "admin" && (
+          <input
+            className="w-full p-3 rounded bg-gray-900 text-white"
+            placeholder="Tätowierer (z.B. bacon)"
+            value={form.tattooist}
+            onChange={e => setForm({ ...form, tattooist: e.target.value })}
+            required
+          />
+        )}
         <button
           type="submit"
           className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
         >
-          {editUser ? "Speichern" : "Anlegen"}
+          {editCustomer ? "Ändern" : "Speichern"}
         </button>
-        {editUser && (
+        {editCustomer && (
           <button
             type="button"
-            onClick={() =>
-              setEditUser(null) ||
-              setForm({ username: "", password: "", role: "tattooist", color: "gray" })
-            }
+            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, customAmount: "", discount: "" }); }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -160,65 +303,71 @@ export default function UserManagement({ user }) {
         )}
       </form>
 
-      {/* Benutzerliste */}
-      <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
-        <thead>
-          <tr className="text-gray-400 text-base border-b border-gray-800">
-            <th className="py-4 px-4 text-left font-semibold">Benutzer</th>
-            <th className="py-4 px-4 text-left font-semibold">Rolle</th>
-            <th className="py-4 px-4 text-left font-semibold">Farbe</th>
-            <th className="py-4 px-4 text-left font-semibold">Sortierung</th>
-            <th className="py-4 px-4"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {users
-            .sort((a, b) => a.order - b.order)
-            .map(u => (
-            <tr key={u.id} className="hover:bg-[#18181b] transition">
-              <td className="py-4 px-4">{u.username}</td>
-              <td className="py-4 px-4">{u.role}</td>
-              <td className="py-4 px-4">{u.color}</td>
-              <td className="py-4 px-4">
-                {u.role === "tattooist" && (
-                  <>
+      {/* Kundenliste */}
+      <div className="overflow-x-auto rounded-2xl shadow-lg">
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
+        ) : customers.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">Noch keine Kunden.</div>
+        ) : (
+          <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
+            <thead>
+              <tr className="text-gray-400 text-base border-b border-gray-800">
+                <th className="py-4 px-4 text-left font-semibold">Name</th>
+                <th className="py-4 px-4 text-left font-semibold">Telefon</th>
+                <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
+                <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
+                <th className="py-4 px-4 text-left font-semibold">Stelle</th>
+                <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
+                <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                <th className="py-4 px-4 text-left font-semibold">Rabatt</th>
+                <th className="py-4 px-4 text-left font-semibold">Custom-Betrag</th>
+                <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
+                <th className="py-4 px-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map(c => (
+                <tr key={c.id} className="hover:bg-[#18181b] transition">
+                  <td className="py-4 px-4">{c.name}</td>
+                  <td className="py-4 px-4">{c.phone}</td>
+                  <td className="py-4 px-4">{c.tattooist}</td>
+                  <td className="py-4 px-4">{c.tattooName}</td>
+                  <td className="py-4 px-4">{c.placement}</td>
+                  <td className="py-4 px-4">{c.sessions}</td>
+                  <td className="py-4 px-4">{c.doneSessions}</td>
+                  <td className="py-4 px-4">{c.discount ? `${c.discount} $` : ""}</td>
+                  <td className="py-4 px-4">{c.customAmount ? `${c.customAmount} $` : ""}</td>
+                  <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                  <td className="py-4 px-4">
                     <button
-                      className="mr-2 bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
-                      disabled={tattooistPos(u.id) === 0}
-                      onClick={() => moveTattooist(u.id, "up")}
-                      title="Nach oben"
+                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}
                     >
-                      ⬆️
+                      {c.isArchived ? "Archiviert" : "Aktiv"}
+                    </button>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button
+                      className="text-blue-400 font-bold px-2"
+                      onClick={() => handleEdit(c)}
+                    >
+                      ✏️
                     </button>
                     <button
-                      className="bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
-                      disabled={tattooistPos(u.id) === tattooistCount() - 1}
-                      onClick={() => moveTattooist(u.id, "down")}
-                      title="Nach unten"
+                      className="text-red-400 font-bold px-2"
+                      onClick={() => deleteCustomer(c.id)}
                     >
-                      ⬇️
+                      🗑
                     </button>
-                  </>
-                )}
-              </td>
-              <td className="py-4 px-4">
-                <button
-                  className="text-blue-400 font-bold px-2"
-                  onClick={() => handleEdit(u)}
-                >
-                  ✏️
-                </button>
-                <button
-                  className="text-red-400 font-bold px-2"
-                  onClick={() => deleteUser(u.id)}
-                >
-                  🗑
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
