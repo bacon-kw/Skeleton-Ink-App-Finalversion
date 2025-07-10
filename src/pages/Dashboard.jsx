@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
 export default function Dashboard({ user }) {
-  const [tattooists, setTattooists] = useState([]);
   const [payouts, setPayouts] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +31,6 @@ export default function Dashboard({ user }) {
 
   async function payoutTattooist(tattooist) {
     if (!window.confirm(`Alle offenen Auszahlungen für ${tattooist} wirklich als "ausgezahlt" markieren?`)) return;
-    // Setze alle offenen Rechnungen für diesen Tätowierer auf ausgezahlt
     await supabase
       .from("invoices")
       .update({ payoutDone: true })
@@ -40,8 +38,6 @@ export default function Dashboard({ user }) {
       .eq("payoutDone", false);
     await loadPayouts();
   }
-
-  // ... weitere Dashboard-Logik
 
   return (
     <div className="max-w-4xl mx-auto mt-10 text-white">
@@ -78,7 +74,7 @@ export default function Dashboard({ user }) {
           </tbody>
         </table>
       )}
-      {/* ... weitere Dashboard-Bereiche */}
+      {/* ...weitere Dashboard-Inhalte */}
     </div>
   );
 }
