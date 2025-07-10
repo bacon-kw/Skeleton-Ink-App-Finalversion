@@ -24,7 +24,7 @@ export default function Dashboard({ user }) {
       .eq("role", "tattooist");
     setTattooists(users || []);
 
-    // Für Admin: alle Daten, für Tätowierer: nur eigene
+    // Für Admin: alle Daten, für Tättowierer: nur eigene
     let custQuery = supabase.from("customers").select("*").eq("isArchived", false);
     let invQuery = supabase.from("invoices").select("*");
     if (user.role !== "admin") {
@@ -72,7 +72,7 @@ export default function Dashboard({ user }) {
   }
 
   async function payoutTattooist(tattooist) {
-    if (!window.confirm(`Alle offenen Auszahlungen für ${tattooist} wirklich als "ausgezahlt" markieren?`)) return;
+    if (!window.confirm(Alle offenen Auszahlungen für ${tattooist} wirklich als "ausgezahlt" markieren?)) return;
     await supabase
       .from("invoices")
       .update({ payoutDone: true })
@@ -90,18 +90,6 @@ export default function Dashboard({ user }) {
     return invoices
       .filter(i => i.tattooist === tattooist)
       .reduce((acc, i) => acc + (Number(i.tattooistWage) || 0), 0);
-  }
-
-  // Neue Funktion: Summe der ausgezahlten Löhne
-  function sumPaidWages() {
-    return invoices
-      .filter(i => i.payoutDone)
-      .reduce((acc, i) => acc + (Number(i.tattooistWage) || 0), 0);
-  }
-
-  // Studio-Kontostand: Umsatz minus ausgezahlte Löhne
-  function studioBalance() {
-    return sumInvoiceAmounts() - sumPaidWages();
   }
 
   function formatCurrency(n) {
@@ -133,7 +121,7 @@ export default function Dashboard({ user }) {
             </div>
           )}
 
-          {/* Tätowierer sehen aktuelle Steuer als Anzeige */}
+          {/* Tättowierer sehen aktuelle Steuer als Anzeige */}
           {user.role === "tattooist" && (
             <div className="mb-8 flex items-center gap-3">
               <span className="text-lg font-semibold">Steuersatz:</span>
@@ -142,7 +130,7 @@ export default function Dashboard({ user }) {
           )}
 
           {/* Überblick */}
-          <div className={`grid grid-cols-1 md:grid-cols-${user.role === "admin" ? "4" : "3"} gap-8 mb-10`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
             <div className="bg-gray-800 p-7 rounded-xl shadow-lg flex flex-col items-center">
               <div className="text-2xl font-bold mb-2">Gesamtumsatz</div>
               <div className="text-4xl font-black">{formatCurrency(sumInvoiceAmounts())}</div>
@@ -155,14 +143,6 @@ export default function Dashboard({ user }) {
               <div className="text-2xl font-bold mb-2">Tätowierer</div>
               <div className="text-4xl font-black">{tattooists.length}</div>
             </div>
-            {/* Kontostand nur für Admin sichtbar */}
-            {user.role === "admin" && (
-              <div className="bg-gray-800 p-7 rounded-xl shadow-lg flex flex-col items-center">
-                <div className="text-2xl font-bold mb-2">Kontostand</div>
-                <div className="text-4xl font-black">{formatCurrency(studioBalance())}</div>
-                <div className="text-xs text-gray-400 mt-1">nach Auszahlung aller Löhne</div>
-              </div>
-            )}
           </div>
 
           {/* Tätowierer-Löhne */}
