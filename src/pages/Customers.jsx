@@ -181,6 +181,10 @@ export default function Customers({ user }) {
     return "hover:bg-[#18181b]";
   }
 
+  // Aktive und archivierte Kunden filtern
+  const aktiveKunden = customers.filter(c => !c.isArchived);
+  const archivierteKunden = customers.filter(c => c.isArchived);
+
   return (
     <div className="max-w-5xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
@@ -289,11 +293,12 @@ export default function Customers({ user }) {
         )}
       </form>
 
-      {/* Kundenliste */}
-      <div className="overflow-x-auto rounded-2xl shadow-lg">
+      {/* Aktive Kunden */}
+      <div className="overflow-x-auto rounded-2xl shadow-lg mb-12">
+        <h2 className="text-2xl font-bold mb-3">Aktive Kunden</h2>
         {loading ? (
           <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
-        ) : customers.length === 0 ? (
+        ) : aktiveKunden.length === 0 ? (
           <div className="text-center py-8 text-gray-400">Noch keine Kunden.</div>
         ) : (
           <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
@@ -312,7 +317,73 @@ export default function Customers({ user }) {
               </tr>
             </thead>
             <tbody>
-              {customers.map(c => (
+              {aktiveKunden.map(c => (
+                <tr
+                  key={c.id}
+                  className={`${getRowClass(c)} transition`}
+                >
+                  <td className="py-4 px-4">{c.name}</td>
+                  <td className="py-4 px-4">{c.phone}</td>
+                  <td className="py-4 px-4">{c.tattooist}</td>
+                  <td className="py-4 px-4">{c.tattooName}</td>
+                  <td className="py-4 px-4">{c.placement}</td>
+                  <td className="py-4 px-4">{c.sessions}</td>
+                  <td className="py-4 px-4">{c.doneSessions}</td>
+                  <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                  <td className="py-4 px-4">
+                    <button
+                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}
+                    >
+                      {c.isArchived ? "Archiviert" : "Aktiv"}
+                    </button>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button
+                      className="text-blue-400 font-bold px-2"
+                      onClick={() => handleEdit(c)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="text-red-400 font-bold px-2"
+                      onClick={() => deleteCustomer(c.id)}
+                    >
+                      🗑
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Archivierte Kunden */}
+      <div className="overflow-x-auto rounded-2xl shadow-lg mb-12">
+        <h2 className="text-2xl font-bold mb-3">Fertige Kunden</h2>
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Lade fertige Kunden...</div>
+        ) : archivierteKunden.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">Keine fertigen Kunden.</div>
+        ) : (
+          <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
+            <thead>
+              <tr className="text-gray-400 text-base border-b border-gray-800">
+                <th className="py-4 px-4 text-left font-semibold">Name</th>
+                <th className="py-4 px-4 text-left font-semibold">Telefon</th>
+                <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
+                <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
+                <th className="py-4 px-4 text-left font-semibold">Stelle</th>
+                <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
+                <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
+                <th className="py-4 px-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {archivierteKunden.map(c => (
                 <tr
                   key={c.id}
                   className={`${getRowClass(c)} transition`}
