@@ -15,7 +15,7 @@ export default function Customers({ user }) {
     doneSessions: 0,
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
-    lastSessionDate: null
+    lastSessionDate: null,
   });
 
   useEffect(() => {
@@ -46,6 +46,8 @@ export default function Customers({ user }) {
       tattooist: customer.tattooist,
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate
+        ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
+        : null,
     });
   }
 
@@ -91,13 +93,12 @@ export default function Customers({ user }) {
 
   async function saveCustomer(e) {
     e.preventDefault();
-    const now = new Date();
     if (editCustomer) {
       const { error } = await supabase.from("customers").update({
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
-        lastSessionDate: now
+        lastSessionDate: form.lastSessionDate ? new Date(form.lastSessionDate) : null
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -110,11 +111,12 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
         });
         loadCustomers();
       }
     } else {
+      const now = new Date();
       const id = uuidv4();
       const { error } = await supabase.from("customers").insert([{
         id,
@@ -138,7 +140,7 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
         });
         loadCustomers();
       }
@@ -160,6 +162,23 @@ export default function Customers({ user }) {
     if (!d) return "";
     const date = new Date(d);
     return date.toLocaleDateString("de-DE");
+  }
+
+  // Hilfsfunktion für Zeilenfarbe
+  function getRowClass(c) {
+    // Letzte Session mindestens 2 Tage her & es sind noch Sessions offen
+    if (
+      c.lastSessionDate &&
+      c.sessions > c.doneSessions
+    ) {
+      const last = new Date(c.lastSessionDate);
+      const now = new Date();
+      const days = (now - last) / (1000 * 60 * 60 * 24);
+      if (days >= 2) {
+        return "bg-green-950/80";
+      }
+    }
+    return "hover:bg-[#18181b]";
   }
 
   return (
@@ -230,6 +249,16 @@ export default function Customers({ user }) {
             required
           />
         )}
+        {/* Datum der letzten Session im Bearbeiten-Modus */}
+        {editCustomer && (
+          <input
+            type="date"
+            className="w-full p-3 rounded bg-gray-900 text-white"
+            value={form.lastSessionDate || ""}
+            onChange={e => setForm({ ...form, lastSessionDate: e.target.value })}
+            required
+          />
+        )}
         <button
           type="submit"
           className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
@@ -239,7 +268,20 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            onClick={() => {
+              setEditCustomer(null);
+              setForm({
+                name: "",
+                phone: "",
+                placement: "",
+                tattooName: "",
+                sessions: 1,
+                doneSessions: 0,
+                tattooist: user.role === "admin" ? "" : user.username,
+                isArchived: false,
+                lastSessionDate: null,
+              });
+            }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -271,7 +313,10 @@ export default function Customers({ user }) {
             </thead>
             <tbody>
               {customers.map(c => (
-                <tr key={c.id} className="hover:bg-[#18181b] transition">
+                <tr
+                  key={c.id}
+                  className={`${getRowClass(c)} transition`}
+                >
                   <td className="py-4 px-4">{c.name}</td>
                   <td className="py-4 px-4">{c.phone}</td>
                   <td className="py-4 px-4">{c.tattooist}</td>
