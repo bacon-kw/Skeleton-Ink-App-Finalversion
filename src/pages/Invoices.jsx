@@ -27,42 +27,6 @@ export default function Invoices({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  function exportCSV() {
-    if (invoices.length === 0) return;
-    const header = [
-      "Rechnungsnummer",
-      "Datum",
-      "Tätowierer",
-      "Kunde",
-      "Tattoo",
-      "Stelle",
-      "Sitzungen",
-      "Betrag",
-      "Steuer"
-    ].join(";");
-    const rows = invoices.map(inv =>
-      [
-        inv.invoiceNumber,
-        formatDate(inv.date),
-        inv.tattooist,
-        inv.customerName,
-        inv.tattooName,
-        inv.placement,
-        inv.sessions,
-        inv.amount,
-        inv.tax
-      ].join(";")
-    );
-    const csvContent = [header, ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "rechnungen.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function handleDelete(id) {
     if (!window.confirm("Willst du diese Rechnung wirklich löschen?")) return;
     await supabase.from("invoices").delete().eq("id", id);
@@ -70,16 +34,8 @@ export default function Invoices({ user }) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 text-white">
+    <div className="max-w-6xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Rechnungen</h1>
-      {user.role === "admin" && (
-        <button
-          onClick={exportCSV}
-          className="mb-5 bg-green-700 hover:bg-green-800 text-white px-5 py-2 rounded font-bold"
-        >
-          Export als CSV
-        </button>
-      )}
       {loading ? (
         <div className="text-center py-8 text-gray-400">Lade Rechnungen...</div>
       ) : invoices.length === 0 ? (
@@ -95,6 +51,8 @@ export default function Invoices({ user }) {
               <th className="py-4 px-4 text-left font-semibold">Tattoo (Stelle)</th>
               <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
               <th className="py-4 px-4 text-left font-semibold">Betrag (€)</th>
+              <th className="py-4 px-4 text-left font-semibold">Lohn</th>
+              <th className="py-4 px-4 text-left font-semibold">Ausgezahlt</th>
               <th className="py-4 px-4"></th>
             </tr>
           </thead>
@@ -110,17 +68,15 @@ export default function Invoices({ user }) {
                 </td>
                 <td className="py-4 px-4">{inv.sessions}</td>
                 <td className="py-4 px-4">{Number(inv.amount).toLocaleString("de-DE")} €</td>
+                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} $` : ""}</td>
+                <td className="py-4 px-4">
+                  {inv.payoutDone ? (
+                    <span className="bg-green-900 text-green-400 px-2 py-1 rounded text-xs">JA</span>
+                  ) : (
+                    <span className="bg-yellow-900 text-yellow-400 px-2 py-1 rounded text-xs">NEIN</span>
+                  )}
+                </td>
                 <td className="py-4 px-4 flex gap-2">
-                  {/* Kopieren-Button */}
-                  <button
-                    className="bg-gray-700 hover:bg-gray-800 text-white text-xs rounded px-3 py-1"
-                    onClick={() => {
-                      const text = `💀 Skeleton Ink Rechnung\nRechnungsnummer: ${inv.invoiceNumber}\nDatum: ${formatDate(inv.date)}\nTätowierer: ${inv.tattooist}\nKunde: ${inv.customerName}\nTattoo: ${inv.placement} (${inv.tattooName})\nSitzungen: ${inv.sessions}\nRechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString("de-DE")} €`;
-                      navigator.clipboard.writeText(text);
-                    }}
-                  >
-                    Kopieren
-                  </button>
                   {/* Löschen nur für Admin */}
                   {user.role === "admin" && (
                     <button
