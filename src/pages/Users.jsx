@@ -2,39 +2,54 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
-const COLORS = ["gray", "red", "blue", "pink", "green", "purple", "orange"];
-
-export default function Users({ user }) {
+export default function UserManagement({ user }) {
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ username: "", password: "", role: "tattooist", color: "gray" });
-  const [editId, setEditId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [editUser, setEditUser] = useState(null);
+  const [form, setForm] = useState({
+    username: "",
+    password: "",
+    role: "tattooist",
+    color: "gray"
+  });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line
+  }, []);
 
-  async function load() {
-    setLoading(true);
-    const { data } = await supabase.from("users").select("*");
+  async function loadUsers() {
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .order("order", { ascending: true });
     setUsers(data || []);
-    setLoading(false);
   }
 
-  async function handleSubmit(e) {
+  async function saveUser(e) {
     e.preventDefault();
-    if (editId) {
-      // Update
-      await supabase.from("users").update(form).eq("id", editId);
-      setEditId(null);
+    if (editUser) {
+      await supabase
+        .from("users")
+        .update({ ...form })
+        .eq("id", editUser.id);
+      setEditUser(null);
     } else {
-      // Insert
-      await supabase.from("users").insert([{ id: uuidv4(), ...form }]);
+      // Bestimme den maximalen aktuellen "order"-Wert:
+      const maxOrder = users.length > 0 ? Math.max(...users.map(u => u.order || 0)) : 0;
+      await supabase.from("users").insert([
+        {
+          id: uuidv4(),
+          ...form,
+          order: maxOrder + 1
+        }
+      ]);
     }
     setForm({ username: "", password: "", role: "tattooist", color: "gray" });
-    load();
+    loadUsers();
   }
 
-  async function handleEdit(u) {
-    setEditId(u.id);
+  function handleEdit(u) {
+    setEditUser(u);
     setForm({
       username: u.username,
       password: u.password,
@@ -44,77 +59,157 @@ export default function Users({ user }) {
   }
 
   async function deleteUser(id) {
-    if (!window.confirm("Diesen Benutzer wirklich löschen?")) return;
+    if (!window.confirm("Benutzer wirklich löschen?")) return;
     await supabase.from("users").delete().eq("id", id);
-    load();
+    loadUsers();
   }
 
-  function handleCancelEdit() {
-    setEditId(null);
-    setForm({ username: "", password: "", role: "tattooist", color: "gray" });
+  // TÄTOWIERER-SORTIERUNG (Up/Down)
+  async function moveUser(userId, direction) {
+    const tattooists = users.filter(u => u.role === "tattooist");
+    const index = tattooists.findIndex(u => u.id === userId);
+    if (
+      (direction === "up" && index === 0) ||
+      (direction === "down" && index === tattooists.length - 1)
+    )
+      return;
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    const userA = tattooists[index];
+    const userB = tattooists[newIndex];
+
+    // Vertausche deren "order"-Werte in der Datenbank
+    await supabase.from("users").update({ order: userB.order }).eq("id", userA.id);
+    await supabase.from("users").update({ order: userA.order }).eq("id", userB.id);
+
+    loadUsers();
   }
 
   return (
     <div className="max-w-3xl mx-auto mt-10 text-white">
-      <h1 className="text-4xl font-extrabold mb-7">Benutzerverwaltung</h1>
-      <form className="mb-8 flex flex-wrap gap-3 bg-gray-800 p-4 rounded-xl" onSubmit={handleSubmit}>
-        <input className="flex-1 p-2 rounded bg-gray-900 text-white" placeholder="Benutzername"
-          value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required />
-        <input className="flex-1 p-2 rounded bg-gray-900 text-white" placeholder="Passwort"
-          value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
-        <select className="p-2 rounded bg-gray-900 text-white"
-          value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-          <option value="tattooist">Tätowierer</option>
-          <option value="admin">Admin</option>
-        </select>
-        <select className="p-2 rounded bg-gray-900 text-white"
-          value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}>
-          {COLORS.map(c => <option value={c} key={c}>{c}</option>)}
-        </select>
-        <button className="bg-pink-700 hover:bg-pink-800 px-4 py-2 rounded font-bold" type="submit">
-          {editId ? "Aktualisieren" : "Benutzer anlegen"}
+      <h1 className="text-3xl font-bold mb-6">Benutzerverwaltung</h1>
+
+      {/* Benutzerformular */}
+      <form onSubmit={saveUser} className="bg-gray-800 p-4 rounded-xl mb-8 space-y-3">
+        <div className="flex gap-3">
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            placeholder="Benutzername"
+            value={form.username}
+            onChange={e => setForm({ ...form, username: e.target.value })}
+            required
+          />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="password"
+            placeholder="Passwort"
+            value={form.password}
+            onChange={e => setForm({ ...form, password: e.target.value })}
+            required
+          />
+        </div>
+        <div className="flex gap-3">
+          <select
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            value={form.role}
+            onChange={e => setForm({ ...form, role: e.target.value })}
+          >
+            <option value="tattooist">Tätowierer</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            value={form.color}
+            onChange={e => setForm({ ...form, color: e.target.value })}
+          >
+            <option value="gray">Grau</option>
+            <option value="red">Rot</option>
+            <option value="blue">Blau</option>
+            <option value="pink">Pink</option>
+            {/* Weitere Farben nach Bedarf */}
+          </select>
+        </div>
+        <button
+          type="submit"
+          className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
+        >
+          {editUser ? "Speichern" : "Anlegen"}
         </button>
-        {editId && (
-          <button className="ml-2 text-gray-400 underline" type="button" onClick={handleCancelEdit}>
+        {editUser && (
+          <button
+            type="button"
+            onClick={() =>
+              setEditUser(null) ||
+              setForm({ username: "", password: "", role: "tattooist", color: "gray" })
+            }
+            className="ml-3 text-gray-400 underline"
+          >
             Abbrechen
           </button>
         )}
       </form>
-      <div className="overflow-x-auto rounded-2xl shadow-lg">
-        {loading ? (
-          <div className="text-center py-8 text-gray-400">Lade Benutzer...</div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">Keine Benutzer.</div>
-        ) : (
-          <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
-            <thead>
-              <tr className="text-gray-400 border-b border-gray-800">
-                <th className="py-3 px-3">Benutzername</th>
-                <th className="py-3 px-3">Rolle</th>
-                <th className="py-3 px-3">Farbe</th>
-                <th className="py-3 px-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="hover:bg-[#18181b]">
-                  <td className="py-3 px-3">{u.username}</td>
-                  <td className="py-3 px-3">{u.role}</td>
-                  <td className="py-3 px-3">{u.color}</td>
-                  <td className="py-3 px-3">
-                    <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(u)}>
-                      ✏️
+
+      {/* Benutzerliste */}
+      <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
+        <thead>
+          <tr className="text-gray-400 text-base border-b border-gray-800">
+            <th className="py-4 px-4 text-left font-semibold">Benutzer</th>
+            <th className="py-4 px-4 text-left font-semibold">Rolle</th>
+            <th className="py-4 px-4 text-left font-semibold">Farbe</th>
+            <th className="py-4 px-4 text-left font-semibold">Sortierung</th>
+            <th className="py-4 px-4"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u, i, arr) => (
+            <tr key={u.id} className="hover:bg-[#18181b] transition">
+              <td className="py-4 px-4">{u.username}</td>
+              <td className="py-4 px-4">{u.role}</td>
+              <td className="py-4 px-4">{u.color}</td>
+              <td className="py-4 px-4">
+                {u.role === "tattooist" && (
+                  <>
+                    <button
+                      className="mr-2 bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
+                      disabled={
+                        users.filter(x => x.role === "tattooist").findIndex(x => x.id === u.id) === 0
+                      }
+                      onClick={() => moveUser(u.id, "up")}
+                      title="Nach oben"
+                    >
+                      ⬆️
                     </button>
-                    <button className="text-red-400 font-bold px-2" onClick={() => deleteUser(u.id)}>
-                      🗑
+                    <button
+                      className="bg-gray-700 px-2 py-1 rounded disabled:opacity-50"
+                      disabled={
+                        users.filter(x => x.role === "tattooist").findIndex(x => x.id === u.id) ===
+                        users.filter(x => x.role === "tattooist").length - 1
+                      }
+                      onClick={() => moveUser(u.id, "down")}
+                      title="Nach unten"
+                    >
+                      ⬇️
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                  </>
+                )}
+              </td>
+              <td className="py-4 px-4">
+                <button
+                  className="text-blue-400 font-bold px-2"
+                  onClick={() => handleEdit(u)}
+                >
+                  ✏️
+                </button>
+                <button
+                  className="text-red-400 font-bold px-2"
+                  onClick={() => deleteUser(u.id)}
+                >
+                  🗑
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
