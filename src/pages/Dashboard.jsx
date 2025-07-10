@@ -24,7 +24,7 @@ export default function Dashboard({ user }) {
       .eq("role", "tattooist");
     setTattooists(users || []);
 
-    // Für Admin: alle Daten, für Tättowierer: nur eigene
+    // Für Admin: alle Daten, für Tätowierer: nur eigene
     let custQuery = supabase.from("customers").select("*").eq("isArchived", false);
     let invQuery = supabase.from("invoices").select("*");
     if (user.role !== "admin") {
@@ -72,7 +72,7 @@ export default function Dashboard({ user }) {
   }
 
   async function payoutTattooist(tattooist) {
-    if (!window.confirm(Alle offenen Auszahlungen für ${tattooist} wirklich als "ausgezahlt" markieren?)) return;
+    if (!window.confirm(`Alle offenen Auszahlungen für ${tattooist} wirklich als "ausgezahlt" markieren?`)) return;
     await supabase
       .from("invoices")
       .update({ payoutDone: true })
@@ -121,7 +121,7 @@ export default function Dashboard({ user }) {
             </div>
           )}
 
-          {/* Tättowierer sehen aktuelle Steuer als Anzeige */}
+          {/* Tätowierer sehen aktuelle Steuer als Anzeige */}
           {user.role === "tattooist" && (
             <div className="mb-8 flex items-center gap-3">
               <span className="text-lg font-semibold">Steuersatz:</span>
@@ -210,4 +210,4 @@ export default function Dashboard({ user }) {
       )}
     </div>
   );
-}          
+}
