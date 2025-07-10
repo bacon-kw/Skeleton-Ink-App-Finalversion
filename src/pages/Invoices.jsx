@@ -26,7 +26,6 @@ export default function Invoices({ user }) {
   }, []);
 
   async function load() {
-    // Alle Rechnungen laden
     let query = supabase.from("invoices").select("*").order("date", { ascending: false });
     if (user.role !== "admin") {
       query = query.eq("tattooist", user.username);
@@ -34,11 +33,9 @@ export default function Invoices({ user }) {
     const { data: invoicesData } = await query;
     setInvoices(invoicesData || []);
 
-    // Kunden für die Auswahl
     const { data: customersData } = await supabase.from("customers").select("*");
     setCustomers(customersData || []);
 
-    // Tätowierer-Liste
     const { data: usersData } = await supabase
       .from("users")
       .select("username")
@@ -53,7 +50,6 @@ export default function Invoices({ user }) {
 
   async function handleSave(e) {
     e.preventDefault();
-    // Falls Studio ausgewählt: kein Tätowierer-Lohn, Material = 0, sessions optional
     const tax = await getTax();
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
@@ -71,10 +67,7 @@ export default function Invoices({ user }) {
     let tattooistWage = isStudio ? 0 : sessions * 1000;
     let materialCosts = isStudio ? 0 : sessions * 500;
 
-    // Optional Text, TattooName etc.
     let textBlock = form.customText || "";
-
-    // Falls Kunde ausgewählt, Text übernehmen
     const customer = customers.find(c => c.name === form.customerName);
 
     await supabase.from("invoices").insert([{
@@ -107,6 +100,12 @@ export default function Invoices({ user }) {
       customText: "",
       studio: false,
     });
+    load();
+  }
+
+  async function deleteInvoice(id) {
+    if (!window.confirm("Soll diese Rechnung wirklich gelöscht werden?")) return;
+    await supabase.from("invoices").delete().eq("id", id);
     load();
   }
 
@@ -255,7 +254,13 @@ export default function Invoices({ user }) {
                   <td className="py-4 px-4">{inv.tattooName}</td>
                   <td className="py-4 px-4">{formatCurrency(inv.amount)}</td>
                   <td className="py-4 px-4">
-                    {/* Du kannst hier weitere Buttons wie Kopieren/Löschen ergänzen */}
+                    {user.role === "admin" && (
+                      <button
+                        className="text-red-400 font-bold px-2"
+                        onClick={() => deleteInvoice(inv.id)}
+                        title="Rechnung löschen"
+                      >🗑</button>
+                    )}
                   </td>
                 </tr>
               ))}
