@@ -179,9 +179,139 @@ export default function Customers({ user }) {
   return (
     <div className="max-w-5xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
-      {/* Formular ... wie gehabt ... */}
-      {/* (Hier kommt dein bestehendes Formular hin) */}
-      {/* Kundenlisten ... wie gehabt ... */}
+      <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
+        <div className="flex flex-wrap gap-3">
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Name"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Telefon"
+            value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo"
+            value={form.tattooName} onChange={e => setForm({ ...form, tattooName: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Tattoo-Stelle"
+            value={form.placement} onChange={e => setForm({ ...form, placement: e.target.value })} required />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={1} max={4} placeholder="Sitzungen"
+            value={form.sessions} onChange={e => setForm({ ...form, sessions: e.target.value })} required />
+          <input className="flex-1 p-3 rounded bg-gray-900 text-white" type="number" min={0} max={4} placeholder="Bisherige Sitzungen"
+            value={form.doneSessions} onChange={e => setForm({ ...form, doneSessions: e.target.value })} required />
+        </div>
+        {user.role === "admin" && (
+          <input className="w-full p-3 rounded bg-gray-900 text-white" placeholder="Tätowierer (z.B. bacon)"
+            value={form.tattooist} onChange={e => setForm({ ...form, tattooist: e.target.value })} required />
+        )}
+        {editCustomer && (
+          <input className="w-full p-3 rounded bg-gray-900 text-white" type="date" placeholder="Letzte Session (Datum)"
+            value={form.lastSessionDate || ""} onChange={e => setForm({ ...form, lastSessionDate: e.target.value })} />
+        )}
+        <button type="submit" className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold">
+          {editCustomer ? "Ändern" : "Speichern"}
+        </button>
+        {editCustomer && (
+          <button type="button" onClick={() => { setEditCustomer(null); setForm({
+            name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0,
+            tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            className="ml-3 text-gray-400 underline">Abbrechen</button>
+        )}
+      </form>
+      <div className="overflow-x-auto rounded-2xl shadow-lg mb-8">
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Lade Kunden...</div>
+        ) : aktiveKunden.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">Noch keine Kunden.</div>
+        ) : (
+          <table className="w-full bg-[#101010] text-white rounded-2xl overflow-hidden">
+            <thead>
+              <tr className="text-gray-400 text-base border-b border-gray-800">
+                <th className="py-4 px-4 text-left font-semibold">Name</th>
+                <th className="py-4 px-4 text-left font-semibold">Telefon</th>
+                <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
+                <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
+                <th className="py-4 px-4 text-left font-semibold">Stelle</th>
+                <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
+                <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
+                <th className="py-4 px-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {aktiveKunden.map(c => (
+                <tr key={c.id} className={`hover:bg-[#18181b] transition ${isHighlight(c) ? "bg-green-950" : ""}`}>
+                  <td className="py-4 px-4">{c.name}</td>
+                  <td className="py-4 px-4">{c.phone}</td>
+                  <td className="py-4 px-4">{c.tattooist}</td>
+                  <td className="py-4 px-4">{c.tattooName}</td>
+                  <td className="py-4 px-4">{c.placement}</td>
+                  <td className="py-4 px-4">{c.sessions}</td>
+                  <td className="py-4 px-4">{c.doneSessions}</td>
+                  <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                  <td className="py-4 px-4">
+                    <button className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
+                      onClick={() => toggleArchive(c)}>
+                      {c.isArchived ? "Archiviert" : "Aktiv"}
+                    </button>
+                  </td>
+                  <td className="py-4 px-4">
+                    <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
+                    <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {/* Fertige/Archivierte Kunden */}
+      {fertigeKunden.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Fertige Kunden</h2>
+          <div className="overflow-x-auto rounded-2xl shadow-lg">
+            <table className="w-full bg-[#18181b] text-white rounded-2xl overflow-hidden">
+              <thead>
+                <tr className="text-gray-400 text-base border-b border-gray-800">
+                  <th className="py-4 px-4 text-left font-semibold">Name</th>
+                  <th className="py-4 px-4 text-left font-semibold">Telefon</th>
+                  <th className="py-4 px-4 text-left font-semibold">Tätowierer</th>
+                  <th className="py-4 px-4 text-left font-semibold">Tattoo</th>
+                  <th className="py-4 px-4 text-left font-semibold">Stelle</th>
+                  <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
+                  <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                  <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                  <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
+                  <th className="py-4 px-4"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fertigeKunden.map(c => (
+                  <tr key={c.id}>
+                    <td className="py-4 px-4">{c.name}</td>
+                    <td className="py-4 px-4">{c.phone}</td>
+                    <td className="py-4 px-4">{c.tattooist}</td>
+                    <td className="py-4 px-4">{c.tattooName}</td>
+                    <td className="py-4 px-4">{c.placement}</td>
+                    <td className="py-4 px-4">{c.sessions}</td>
+                    <td className="py-4 px-4">{c.doneSessions}</td>
+                    <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                    <td className="py-4 px-4">
+                      <button className="text-xs px-2 py-1 rounded-full bg-yellow-700 text-white"
+                        onClick={() => toggleArchive(c)}>
+                        Archiviert
+                      </button>
+                    </td>
+                    <td className="py-4 px-4">
+                      <button className="text-blue-400 font-bold px-2" onClick={() => handleEdit(c)}>✏️</button>
+                      <button className="text-red-400 font-bold px-2" onClick={() => deleteCustomer(c.id)}>🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
