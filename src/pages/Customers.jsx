@@ -56,12 +56,12 @@ export default function Customers({ user }) {
     return data && data.value ? Number(data.value) : 19;
   }
 
-  async function createInvoiceForCustomer(customerId, formValues) {
-    // Verhindere doppelte Rechnungen:
+  async function createInvoiceForCustomer(customer) {
+    // Falls schon eine Rechnung für diesen Kunden existiert: NICHT nochmal!
     const { data: existing } = await supabase
       .from("invoices")
       .select("id")
-      .eq("customerId", customerId);
+      .eq("customerId", customer.id);
     if (existing && existing.length > 0) return;
 
     const year = new Date().getFullYear();
@@ -73,7 +73,7 @@ export default function Customers({ user }) {
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
-    const sessions = Number(formValues.sessions);
+    const sessions = Number(customer.sessions);
 
     const amountNet = sessions * 1500;
     const materialCosts = sessions * 500;
@@ -84,14 +84,14 @@ export default function Customers({ user }) {
       id: uuidv4(),
       invoiceNumber,
       date: new Date(),
-      tattooist: formValues.tattooist,
-      customerName: formValues.name,
-      tattooName: formValues.tattooName,
-      placement: formValues.placement,
+      tattooist: customer.tattooist,
+      customerName: customer.name,
+      tattooName: customer.tattooName,
+      placement: customer.placement,
       sessions,
       amount: finalAmount,
       tax,
-      customerId: customerId,
+      customerId: customer.id,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
       payoutDone: false,
@@ -125,19 +125,17 @@ export default function Customers({ user }) {
       }
     } else {
       const now = new Date();
-      const id = uuidv4();
-      const { error } = await supabase.from("customers").insert([{
-        id,
+      const { data, error } = await supabase.from("customers").insert([{
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
         date: now,
         isArchived: false,
         lastSessionDate: now
-      }]);
-      if (!error) {
-        // Automatisch Rechnung anlegen!
-        await createInvoiceForCustomer(id, { ...form, sessions: parseInt(form.sessions) });
+      }]).select("*").single();
+      if (!error && data) {
+        // Jetzt garantiert: data enthält die ID!
+        await createInvoiceForCustomer(data);
         setForm({
           name: "",
           phone: "",
@@ -236,7 +234,6 @@ export default function Customers({ user }) {
     <div className="max-w-5xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
       <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
-        {/* ... wie gehabt, siehe oben ... */}
         <div className="flex flex-wrap gap-3">
           <input className="flex-1 p-3 rounded bg-gray-900 text-white" placeholder="Name"
             value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
