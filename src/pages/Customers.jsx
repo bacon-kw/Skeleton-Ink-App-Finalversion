@@ -56,14 +56,8 @@ export default function Customers({ user }) {
     return data && data.value ? Number(data.value) : 19;
   }
 
-  async function createInvoiceForCustomer(customer) {
-    // Prüfe, ob bereits eine Rechnung für diesen Kunden existiert
-    const { data: existing } = await supabase
-      .from("invoices")
-      .select("id")
-      .eq("customerId", customer.id);
-    if (existing && existing.length > 0) return;
-
+  async function createInvoiceForCustomer(customerId, formValues) {
+    // Erstelle die Rechnung direkt NACHDEM der Kunde gespeichert wurde!
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
       .from("invoices")
@@ -73,7 +67,7 @@ export default function Customers({ user }) {
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
-    const sessions = Number(customer.sessions);
+    const sessions = Number(formValues.sessions);
 
     const amountNet = sessions * 1500;
     const materialCosts = sessions * 500;
@@ -84,14 +78,14 @@ export default function Customers({ user }) {
       id: uuidv4(),
       invoiceNumber,
       date: new Date(),
-      tattooist: customer.tattooist,
-      customerName: customer.name,
-      tattooName: customer.tattooName,
-      placement: customer.placement,
+      tattooist: formValues.tattooist,
+      customerName: formValues.name,
+      tattooName: formValues.tattooName,
+      placement: formValues.placement,
       sessions,
       amount: finalAmount,
       tax,
-      customerId: customer.id,
+      customerId: customerId,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
       payoutDone: false,
@@ -136,10 +130,8 @@ export default function Customers({ user }) {
         lastSessionDate: now
       }]);
       if (!error) {
-        // NUR beim Anlegen wird die Rechnung erzeugt!
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
-        await createInvoiceForCustomer(customerObj);
-
+        // NUR beim Anlegen: Rechnung direkt nach erfolgreichem Insert erstellen!
+        await createInvoiceForCustomer(id, { ...form, sessions: parseInt(form.sessions) });
         setForm({
           name: "",
           phone: "",
