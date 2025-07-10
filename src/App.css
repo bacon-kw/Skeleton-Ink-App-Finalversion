@@ -1,0 +1,54 @@
+/* src/App.css */
+
+/* Skelett-Tattoo-Schriftzug als Deko (z.B. für Header) */
+.skeleton-logo {
+  font-family: 'Inter', serif;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: #fafaf9;
+  text-shadow:
+    0 2px 10px #a21caf88,
+    0 0px 2px #000;
+  font-size: 2.1rem;
+}
+
+/* Kleine goth-border unter Header */
+.skeleton-underline {
+  border-bottom: 2px solid #a21caf;
+  box-shadow: 0 2px 16px #a21caf33;
+  margin-bottom: 0.5rem;
+}
+
+/* Animation für modale Fenster */
+@keyframes modalFadeIn {
+  0% { opacity: 0; transform: translateY(30px) scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+
+.modal-fade {
+  animation: modalFadeIn 0.25s cubic-bezier(.8,-0.04,.53,1.04);
+}
+
+/* Sanfte Schwebewirkung für Karten */
+.card-hover:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 6px 32px 0 #a21caf33, 0 1.5px 4px #000a;
+  transition: all 0.16s;
+}
+
+/* Extra dunkle Seite */
+body {
+  background-color: #18181b;
+}
+
+/* Kleine pinke Akzente für Buttons beim Hover */
+button:hover {
+  filter: brightness(1.14);
+  box-shadow: 0 0 12px #e11d4895;
+}
+
+/* Für Haupt-Layout (App) */
+.app-bg {
+  background: linear-gradient(135deg, #18181b 75%, #3b0764 100%);
+  min-height: 100vh;
+}
