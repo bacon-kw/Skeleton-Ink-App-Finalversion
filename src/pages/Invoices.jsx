@@ -34,7 +34,7 @@ export default function Invoices({ user }) {
   }
 
   function invoiceText(inv) {
-    return `🌙 Midnight Tattoo Rechnung
+    return `💀 SKELETON INK RECHNUNG
 Rechnungsnummer: ${inv.invoiceNumber}
 Datum: ${formatDate(inv.date)}
 Tätowierer: ${inv.tattooist}
