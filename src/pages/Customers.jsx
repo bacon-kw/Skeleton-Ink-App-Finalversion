@@ -16,8 +16,6 @@ export default function Customers({ user }) {
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
     lastSessionDate: null,
-    customAmount: "",
-    discount: ""
   });
 
   useEffect(() => {
@@ -48,19 +46,26 @@ export default function Customers({ user }) {
       tattooist: customer.tattooist,
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate,
-      customAmount: customer.customAmount || "",
-      discount: customer.discount || ""
     });
   }
 
+  // Hilfsfunktion um den aktuellen Steuersatz zu laden
   async function getTax() {
     const { data } = await supabase.from("settings").select("value").eq("key", "tax").single();
     return data && data.value ? Number(data.value) : 19;
   }
 
+  // Automatische Rechnungserstellung für neuen Kunden
   async function createInvoiceForCustomer(customer) {
-    // Prüfe, ob schon Rechnung existiert (lösche diese Prüfung!)
-    // Es soll für JEDEN Kunden beim Erstellen immer eine Rechnung angelegt werden!
+    // Verhindere doppelte Rechnungen für denselben Kunden
+    const { data: existingInvoices } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("customerId", customer.id);
+
+    if (existingInvoices && existingInvoices.length > 0) return;
+
+    // Zähle Rechnungen dieses Jahres, um Rechnungsnummer zu generieren
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
       .from("invoices")
@@ -71,33 +76,9 @@ export default function Customers({ user }) {
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
 
     const tax = await getTax();
-    const sessions = Number(customer.sessions);
-    const materialCosts = 500; // immer mindestens 500
-    let usedDiscount = customer.discount ? parseInt(customer.discount) : 0;
-
-    // Standard-Berechnung
-    let amountNet = sessions * 1500;
-    let tattooistWage = sessions * 1000;
-
-    // Rabatt berücksichtigen (vom Gesamtbetrag abziehen)
-    if (usedDiscount > 0 && usedDiscount < amountNet) {
-      amountNet = amountNet - usedDiscount;
-    }
-
-    let finalAmount;
-    let isCustom = false;
-    let customTattooistWage = null;
-
-    // Custom Amount (inkl. Steuer)
-    if (customer.customAmount && parseInt(customer.customAmount) > 0) {
-      finalAmount = parseInt(customer.customAmount);
-      isCustom = true;
-      // Lohn = Netto(!) - Materialkosten
-      const netto = finalAmount / (1 + tax / 100);
-      customTattooistWage = Math.round(Math.max(netto - materialCosts, 0));
-    } else {
-      finalAmount = Math.round(amountNet * (1 + tax / 100));
-    }
+    const sessions = customer.sessions;
+    const amountNet = sessions * 1500;
+    const amount = Math.round(amountNet * (1 + tax / 100));
 
     await supabase.from("invoices").insert([{
       id: uuidv4(),
@@ -108,14 +89,9 @@ export default function Customers({ user }) {
       tattooName: customer.tattooName,
       placement: customer.placement,
       sessions,
-      amount: finalAmount,
+      amount,
       tax,
-      customerId: customer.id,
-      materialCosts: materialCosts,
-      tattooistWage: isCustom ? customTattooistWage : tattooistWage,
-      isCustom,
-      discount: usedDiscount,
-      customAmount: isCustom ? finalAmount : null
+      customerId: customer.id
     }]);
   }
 
@@ -123,13 +99,12 @@ export default function Customers({ user }) {
     e.preventDefault();
     const now = new Date();
     if (editCustomer) {
+      // Beim Ändern wird KEINE Rechnung erstellt!
       const { error } = await supabase.from("customers").update({
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
-        lastSessionDate: now,
-        customAmount: form.customAmount ? parseInt(form.customAmount) : null,
-        discount: form.discount ? parseInt(form.discount) : null
+        lastSessionDate: now // update bei Änderung
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -143,8 +118,6 @@ export default function Customers({ user }) {
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
           lastSessionDate: null,
-          customAmount: "",
-          discount: ""
         });
         loadCustomers();
       }
@@ -158,11 +131,10 @@ export default function Customers({ user }) {
         date: now,
         isArchived: false,
         lastSessionDate: now,
-        customAmount: form.customAmount ? parseInt(form.customAmount) : null,
-        discount: form.discount ? parseInt(form.discount) : null
       }]);
       if (!error) {
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions), customAmount: form.customAmount, discount: form.discount, tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        // Nur beim Anlegen wird die Rechnung erstellt!
+        const customerObj = { ...form, id, sessions: parseInt(form.sessions) };
         await createInvoiceForCustomer(customerObj);
 
         setForm({
@@ -175,8 +147,6 @@ export default function Customers({ user }) {
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
           lastSessionDate: null,
-          customAmount: "",
-          discount: ""
         });
         loadCustomers();
       }
@@ -259,24 +229,6 @@ export default function Customers({ user }) {
             required
           />
         </div>
-        <div className="flex flex-wrap gap-3">
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            type="number"
-            min={0}
-            placeholder="Rabatt ($, optional)"
-            value={form.discount}
-            onChange={e => setForm({ ...form, discount: e.target.value })}
-          />
-          <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
-            type="number"
-            min={0}
-            placeholder="Individueller Rechnungsbetrag ($, optional)"
-            value={form.customAmount}
-            onChange={e => setForm({ ...form, customAmount: e.target.value })}
-          />
-        </div>
         {user.role === "admin" && (
           <input
             className="w-full p-3 rounded bg-gray-900 text-white"
@@ -295,7 +247,7 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, customAmount: "", discount: "" }); }}
+            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -320,8 +272,6 @@ export default function Customers({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Stelle</th>
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
-                <th className="py-4 px-4 text-left font-semibold">Rabatt</th>
-                <th className="py-4 px-4 text-left font-semibold">Custom-Betrag</th>
                 <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
                 <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
                 <th className="py-4 px-4"></th>
@@ -337,8 +287,6 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.placement}</td>
                   <td className="py-4 px-4">{c.sessions}</td>
                   <td className="py-4 px-4">{c.doneSessions}</td>
-                  <td className="py-4 px-4">{c.discount ? `${c.discount} $` : ""}</td>
-                  <td className="py-4 px-4">{c.customAmount ? `${c.customAmount} $` : ""}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
                     <button
