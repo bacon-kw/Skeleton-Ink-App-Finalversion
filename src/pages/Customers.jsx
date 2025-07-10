@@ -31,10 +31,8 @@ export default function Customers({ user }) {
     }
     const { data, error } = await query;
     if (!error) {
-      // Archivierte ans Ende!
       data.sort((a, b) => {
         if (a.isArchived === b.isArchived) {
-          // Optional: Sortiere aktive nach neuem Datum zuerst
           return new Date(b.date || b.created_at) - new Date(a.date || a.created_at);
         }
         return a.isArchived ? 1 : -1;
@@ -66,14 +64,7 @@ export default function Customers({ user }) {
     return data && data.value ? Number(data.value) : 19;
   }
 
-  async function createInvoiceForCustomer(customer) {
-    // Erstelle nur eine Rechnung, falls noch keine existiert:
-    const { data: existing } = await supabase
-      .from("invoices")
-      .select("id")
-      .eq("customerId", customer.id);
-    if (existing && existing.length > 0) return;
-
+  async function createInvoiceForCustomer(customerData) {
     const year = new Date().getFullYear();
     const { data: yearInvoices } = await supabase
       .from("invoices")
@@ -83,7 +74,7 @@ export default function Customers({ user }) {
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
-    const sessions = Number(customer.sessions);
+    const sessions = Number(customerData.sessions);
 
     const amountNet = sessions * 1500;
     const materialCosts = sessions * 500;
@@ -94,14 +85,14 @@ export default function Customers({ user }) {
       id: uuidv4(),
       invoiceNumber,
       date: new Date(),
-      tattooist: customer.tattooist,
-      customerName: customer.name,
-      tattooName: customer.tattooName,
-      placement: customer.placement,
+      tattooist: customerData.tattooist,
+      customerName: customerData.name,
+      tattooName: customerData.tattooName,
+      placement: customerData.placement,
       sessions,
       amount: finalAmount,
       tax,
-      customerId: customer.id,
+      customerId: customerData.id,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
       payoutDone: false,
@@ -135,17 +126,19 @@ export default function Customers({ user }) {
       }
     } else {
       const now = new Date();
-      // Nutze .select("*").single() um die ID des Kunden direkt zurück zu bekommen!
-      const { data: inserted, error } = await supabase.from("customers").insert([{
+      const id = uuidv4();
+      const { error } = await supabase.from("customers").insert([{
+        id,
         ...form,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
         date: now,
         isArchived: false,
         lastSessionDate: now
-      }]).select("*").single();
-      if (!error && inserted) {
-        await createInvoiceForCustomer(inserted);
+      }]);
+      if (!error) {
+        // Jetzt sicher: id und alle Felder bekannt!
+        await createInvoiceForCustomer({ ...form, id, sessions: parseInt(form.sessions) });
         setForm({
           name: "",
           phone: "",
