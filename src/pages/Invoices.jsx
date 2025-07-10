@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-// Optional: import { v4 as uuidv4 } from "uuid"; (für individuelle Rechnungen)
 
 export default function Invoices({ user }) {
   const [invoices, setInvoices] = useState([]);
@@ -35,7 +34,7 @@ export default function Invoices({ user }) {
   }
 
   function invoiceText(inv) {
-    return `🌙 Midnight Tattoo Rechnung
+    return `💀 Skeleton Ink Rechnung
 Rechnungsnummer: ${inv.invoiceNumber}
 Datum: ${formatDate(inv.date)}
 Tätowierer: ${inv.tattooist}
@@ -55,12 +54,9 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
     }
   }
 
-  // Hier könntest du einen Button + Modal für individuelle Rechnungen einbauen
-
   return (
     <div className="max-w-6xl mx-auto mt-10 text-white">
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Rechnungen</h1>
-      {/* Optional: Button "Rechnung hinzufügen" für individuelle Rechnungen */}
       {loading ? (
         <div className="text-center py-8 text-gray-400">Lade Rechnungen...</div>
       ) : invoices.length === 0 ? (
@@ -76,8 +72,6 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
               <th className="py-4 px-4 text-left font-semibold">Tattoo (Stelle)</th>
               <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
               <th className="py-4 px-4 text-left font-semibold">Betrag ($)</th>
-              <th className="py-4 px-4 text-left font-semibold">Lohn</th>
-              <th className="py-4 px-4 text-left font-semibold">Ausgezahlt</th>
               <th className="py-4 px-4"></th>
             </tr>
           </thead>
@@ -93,14 +87,6 @@ Rechnungsbetrag (inkl. ${inv.tax}% Steuer): ${Number(inv.amount).toLocaleString(
                 </td>
                 <td className="py-4 px-4">{inv.sessions}</td>
                 <td className="py-4 px-4">{Number(inv.amount).toLocaleString("de-DE")} $</td>
-                <td className="py-4 px-4">{inv.tattooistWage ? `${inv.tattooistWage} $` : ""}</td>
-                <td className="py-4 px-4">
-                  {inv.payoutDone ? (
-                    <span className="bg-green-900 text-green-400 px-2 py-1 rounded text-xs">JA</span>
-                  ) : (
-                    <span className="bg-yellow-900 text-yellow-400 px-2 py-1 rounded text-xs">NEIN</span>
-                  )}
-                </td>
                 <td className="py-4 px-4 flex flex-col gap-2">
                   <pre
                     className="bg-gray-900 text-xs p-2 rounded mb-2 whitespace-pre-line break-words"
