@@ -15,7 +15,8 @@ export default function Customers({ user }) {
     doneSessions: 0,
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
-    lastSessionDate: null
+    lastSessionDate: null,
+    discount: 0,
   });
 
   useEffect(() => {
@@ -56,7 +57,8 @@ export default function Customers({ user }) {
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate
         ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
-        : null
+        : null,
+      discount: customer.discount || 0,
     });
   }
 
@@ -82,8 +84,12 @@ export default function Customers({ user }) {
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
     const sessions = Number(customer.sessions);
+    const discount = customer.discount ? Number(customer.discount) : 0;
 
-    const amountNet = sessions * 1500;
+    let amountNet = sessions * 1500;
+    if (discount > 0) {
+      amountNet = amountNet * (1 - discount / 100);
+    }
     const materialCosts = sessions * 500;
     const tattooistWage = sessions * 1000;
     const finalAmount = Math.round(amountNet * (1 + tax / 100));
@@ -99,6 +105,7 @@ export default function Customers({ user }) {
       sessions,
       amount: finalAmount,
       tax,
+      discount, // Optional: Discount zur Rechnung speichern
       customerId: customer.id,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
@@ -112,6 +119,7 @@ export default function Customers({ user }) {
     if (editCustomer) {
       const { error } = await supabase.from("customers").update({
         ...form,
+        discount: parseInt(form.discount) || 0,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
         lastSessionDate: form.lastSessionDate
@@ -129,7 +137,8 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
+          discount: 0,
         });
         loadCustomers();
       }
@@ -138,6 +147,7 @@ export default function Customers({ user }) {
       const { error } = await supabase.from("customers").insert([{
         id,
         ...form,
+        discount: parseInt(form.discount) || 0,
         sessions: parseInt(form.sessions),
         doneSessions: parseInt(form.doneSessions),
         date: now,
@@ -145,7 +155,7 @@ export default function Customers({ user }) {
         lastSessionDate: now
       }]);
       if (!error) {
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        const customerObj = { ...form, id, sessions: parseInt(form.sessions), discount: parseInt(form.discount) || 0, tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
         await createInvoiceForCustomer(customerObj);
 
         setForm({
@@ -157,7 +167,8 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
+          discount: 0,
         });
         loadCustomers();
       }
@@ -181,7 +192,6 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  // --- FARBLICHES HIGHLIGHT (Grünlich) ---
   function isHighlight(c) {
     if (!c.lastSessionDate) return false;
     const last = new Date(c.lastSessionDate);
@@ -248,6 +258,15 @@ export default function Customers({ user }) {
             onChange={e => setForm({ ...form, doneSessions: e.target.value })}
             required
           />
+          <input
+            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            max={100}
+            placeholder="Rabatt (%)"
+            value={form.discount}
+            onChange={e => setForm({ ...form, discount: e.target.value })}
+          />
         </div>
         {user.role === "admin" && (
           <input
@@ -276,7 +295,7 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, discount: 0 }); }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -301,6 +320,7 @@ export default function Customers({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Stelle</th>
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
+                <th className="py-4 px-4 text-left font-semibold">Rabatt (%)</th>
                 <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
                 <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
                 <th className="py-4 px-4"></th>
@@ -316,6 +336,7 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.placement}</td>
                   <td className="py-4 px-4">{c.sessions}</td>
                   <td className="py-4 px-4">{c.doneSessions}</td>
+                  <td className="py-4 px-4">{c.discount || 0}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
                     <button
@@ -347,13 +368,4 @@ export default function Customers({ user }) {
       </div>
     </div>
   );
-}
-
-// Highlight: ab 2 Tage her und noch nicht fertig --> grünlich!
-function isHighlight(c) {
-  if (!c.lastSessionDate) return false;
-  const last = new Date(c.lastSessionDate);
-  const now = new Date();
-  const days = (now - last) / (1000 * 60 * 60 * 24);
-  return days >= 2 && c.doneSessions < c.sessions && !c.isArchived;
 }
