@@ -85,7 +85,7 @@ export default function Customers({ user }) {
     const tax = await getTax();
     const sessions = Number(customer.sessions);
 
-    // NEU: Prüfe ob Gesamtpreis gesetzt wurde, sonst Standard
+    // Gesamtpreis verwenden falls vorhanden, sonst Standard-Berechnung
     let amountNet;
     if (
       customer.totalPrice !== undefined &&
@@ -274,10 +274,10 @@ export default function Customers({ user }) {
             required
           />
         </div>
-        {/* Gesamtpreis optional */}
+        {/* Gesamtpreis optional - jetzt extra breit */}
         <div>
           <input
-            className="w-full p-3 rounded bg-gray-900 text-white"
+            className="w-full max-w-2xl p-3 rounded bg-gray-900 text-white"
             type="number"
             min={0}
             step="0.01"
