@@ -85,7 +85,6 @@ export default function Customers({ user }) {
     const tax = await getTax();
     const sessions = Number(customer.sessions);
 
-    // Gesamtpreis verwenden falls vorhanden, sonst Standard-Berechnung
     let amountNet;
     if (
       customer.totalPrice !== undefined &&
@@ -206,7 +205,6 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  // --- FARBLICHES HIGHLIGHT (Grünlich) ---
   function isHighlight(c) {
     if (!c.lastSessionDate) return false;
     const last = new Date(c.lastSessionDate);
@@ -220,41 +218,37 @@ export default function Customers({ user }) {
       <h1 className="text-4xl font-extrabold mb-7 tracking-tight">Kunden</h1>
       {/* Kundenformular */}
       <form onSubmit={saveCustomer} className="mb-8 space-y-3 bg-gray-800 p-4 rounded-xl max-w-2xl">
-        <div className="flex flex-wrap gap-3">
+        <div className="space-y-3">
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             placeholder="Name"
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             required
           />
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             placeholder="Telefon"
             value={form.phone}
             onChange={e => setForm({ ...form, phone: e.target.value })}
             required
           />
-        </div>
-        <div className="flex flex-wrap gap-3">
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             placeholder="Tattoo"
             value={form.tattooName}
             onChange={e => setForm({ ...form, tattooName: e.target.value })}
             required
           />
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             placeholder="Tattoo-Stelle"
             value={form.placement}
             onChange={e => setForm({ ...form, placement: e.target.value })}
             required
           />
-        </div>
-        <div className="flex flex-wrap gap-3">
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             type="number"
             min={1}
             max={4}
@@ -264,7 +258,7 @@ export default function Customers({ user }) {
             required
           />
           <input
-            className="flex-1 p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             type="number"
             min={0}
             max={4}
@@ -273,11 +267,9 @@ export default function Customers({ user }) {
             onChange={e => setForm({ ...form, doneSessions: e.target.value })}
             required
           />
-        </div>
-        {/* Gesamtpreis optional - jetzt extra breit */}
-        <div>
+          {/* Gesamtpreis optional */}
           <input
-            className="w-full max-w-2xl p-3 rounded bg-gray-900 text-white"
+            className="w-full p-3 rounded bg-gray-900 text-white"
             type="number"
             min={0}
             step="0.01"
@@ -285,54 +277,56 @@ export default function Customers({ user }) {
             value={form.totalPrice}
             onChange={e => setForm({ ...form, totalPrice: e.target.value })}
           />
+          {user.role === "admin" && (
+            <input
+              className="w-full p-3 rounded bg-gray-900 text-white"
+              placeholder="Tätowierer (z.B. bacon)"
+              value={form.tattooist}
+              onChange={e => setForm({ ...form, tattooist: e.target.value })}
+              required
+            />
+          )}
+          {editCustomer && (
+            <input
+              className="w-full p-3 rounded bg-gray-900 text-white"
+              type="date"
+              placeholder="Letzte Session (Datum)"
+              value={form.lastSessionDate || ""}
+              onChange={e => setForm({ ...form, lastSessionDate: e.target.value })}
+            />
+          )}
         </div>
-        {user.role === "admin" && (
-          <input
-            className="w-full p-3 rounded bg-gray-900 text-white"
-            placeholder="Tätowierer (z.B. bacon)"
-            value={form.tattooist}
-            onChange={e => setForm({ ...form, tattooist: e.target.value })}
-            required
-          />
-        )}
-        {editCustomer && (
-          <input
-            className="w-full p-3 rounded bg-gray-900 text-white"
-            type="date"
-            placeholder="Letzte Session (Datum)"
-            value={form.lastSessionDate || ""}
-            onChange={e => setForm({ ...form, lastSessionDate: e.target.value })}
-          />
-        )}
-        <button
-          type="submit"
-          className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
-        >
-          {editCustomer ? "Ändern" : "Speichern"}
-        </button>
-        {editCustomer && (
+        <div className="mt-3">
           <button
-            type="button"
-            onClick={() => {
-              setEditCustomer(null);
-              setForm({
-                name: "",
-                phone: "",
-                placement: "",
-                tattooName: "",
-                sessions: 1,
-                doneSessions: 0,
-                tattooist: user.role === "admin" ? "" : user.username,
-                isArchived: false,
-                lastSessionDate: null,
-                totalPrice: ""
-              });
-            }}
-            className="ml-3 text-gray-400 underline"
+            type="submit"
+            className="bg-pink-700 hover:bg-pink-800 text-white px-5 py-2 rounded font-bold"
           >
-            Abbrechen
+            {editCustomer ? "Ändern" : "Speichern"}
           </button>
-        )}
+          {editCustomer && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditCustomer(null);
+                setForm({
+                  name: "",
+                  phone: "",
+                  placement: "",
+                  tattooName: "",
+                  sessions: 1,
+                  doneSessions: 0,
+                  tattooist: user.role === "admin" ? "" : user.username,
+                  isArchived: false,
+                  lastSessionDate: null,
+                  totalPrice: ""
+                });
+              }}
+              className="ml-3 text-gray-400 underline"
+            >
+              Abbrechen
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Kundenliste */}
