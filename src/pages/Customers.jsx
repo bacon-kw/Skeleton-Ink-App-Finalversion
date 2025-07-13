@@ -16,7 +16,7 @@ export default function Customers({ user }) {
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
     lastSessionDate: null,
-    totalPrice: "" // <--- NEU
+    totalPrice: ""
   });
 
   useEffect(() => {
@@ -32,6 +32,7 @@ export default function Customers({ user }) {
     }
     const { data, error } = await query;
     if (!error) {
+      // Archivierte nach unten sortieren
       data.sort((a, b) => {
         if (a.isArchived === b.isArchived) {
           return new Date(b.date || b.created_at) - new Date(a.date || a.created_at);
@@ -57,7 +58,7 @@ export default function Customers({ user }) {
       lastSessionDate: customer.lastSessionDate
         ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
         : null,
-      totalPrice: customer.totalPrice || "" // <--- NEU
+      totalPrice: customer.totalPrice !== null && customer.totalPrice !== undefined ? customer.totalPrice : ""
     });
   }
 
@@ -84,7 +85,17 @@ export default function Customers({ user }) {
     const tax = await getTax();
     const sessions = Number(customer.sessions);
 
-    const amountNet = sessions * 1500;
+    // NEU: Prüfe ob Gesamtpreis gesetzt wurde, sonst Standard
+    let amountNet;
+    if (
+      customer.totalPrice !== undefined &&
+      customer.totalPrice !== null &&
+      customer.totalPrice !== ""
+    ) {
+      amountNet = parseFloat(customer.totalPrice);
+    } else {
+      amountNet = sessions * 1500;
+    }
     const materialCosts = sessions * 500;
     const tattooistWage = sessions * 1000;
     const finalAmount = Math.round(amountNet * (1 + tax / 100));
@@ -118,7 +129,7 @@ export default function Customers({ user }) {
         lastSessionDate: form.lastSessionDate
           ? new Date(form.lastSessionDate)
           : now,
-        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice) // <--- NEU
+        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice)
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -132,7 +143,7 @@ export default function Customers({ user }) {
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
           lastSessionDate: null,
-          totalPrice: "" // <--- NEU
+          totalPrice: ""
         });
         loadCustomers();
       }
@@ -146,10 +157,19 @@ export default function Customers({ user }) {
         date: now,
         isArchived: false,
         lastSessionDate: now,
-        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice) // <--- NEU
+        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice)
       }]);
       if (!error) {
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        const customerObj = {
+          ...form,
+          id,
+          sessions: parseInt(form.sessions),
+          tattooist: form.tattooist,
+          name: form.name,
+          tattooName: form.tattooName,
+          placement: form.placement,
+          totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice)
+        };
         await createInvoiceForCustomer(customerObj);
 
         setForm({
@@ -162,7 +182,7 @@ export default function Customers({ user }) {
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
           lastSessionDate: null,
-          totalPrice: "" // <--- NEU
+          totalPrice: ""
         });
         loadCustomers();
       }
@@ -186,6 +206,7 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
+  // --- FARBLICHES HIGHLIGHT (Grünlich) ---
   function isHighlight(c) {
     if (!c.lastSessionDate) return false;
     const last = new Date(c.lastSessionDate);
@@ -253,7 +274,7 @@ export default function Customers({ user }) {
             required
           />
         </div>
-        {/* NEU: Gesamtpreis */}
+        {/* Gesamtpreis optional */}
         <div>
           <input
             className="w-full p-3 rounded bg-gray-900 text-white"
@@ -292,7 +313,21 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, totalPrice: "" }); }}
+            onClick={() => {
+              setEditCustomer(null);
+              setForm({
+                name: "",
+                phone: "",
+                placement: "",
+                tattooName: "",
+                sessions: 1,
+                doneSessions: 0,
+                tattooist: user.role === "admin" ? "" : user.username,
+                isArchived: false,
+                lastSessionDate: null,
+                totalPrice: ""
+              });
+            }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -318,7 +353,7 @@ export default function Customers({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
                 <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
-                <th className="py-4 px-4 text-left font-semibold">Gesamtpreis</th> {/* NEU */}
+                <th className="py-4 px-4 text-left font-semibold">Gesamtpreis</th>
                 <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
                 <th className="py-4 px-4"></th>
               </tr>
