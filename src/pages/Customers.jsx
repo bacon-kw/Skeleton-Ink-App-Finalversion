@@ -76,10 +76,10 @@ export default function Customers({ user }) {
     const { data: yearInvoices } = await supabase
       .from("invoices")
       .select("id")
-      .gte("date", ${year}-01-01)
-      .lte("date", ${year}-12-31);
+      .gte("date", `${year}-01-01`)
+      .lte("date", `${year}-12-31`);
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
-    const invoiceNumber = SKE-${year}-${String(invoiceCount).padStart(3, "0")};
+    const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
     const sessions = Number(customer.sessions);
 
@@ -308,7 +308,7 @@ export default function Customers({ user }) {
             </thead>
             <tbody>
               {customers.map(c => (
-                <tr key={c.id} className={transition ${isHighlight(c) ? "bg-green-950" : "hover:bg-[#18181b]"} ${c.isArchived ? "opacity-70" : ""}}>
+                <tr key={c.id} className={`transition ${isHighlight(c) ? "bg-green-950" : "hover:bg-[#18181b]"} ${c.isArchived ? "opacity-70" : ""}`}>
                   <td className="py-4 px-4">{c.name}</td>
                   <td className="py-4 px-4">{c.phone}</td>
                   <td className="py-4 px-4">{c.tattooist}</td>
@@ -319,7 +319,7 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
                     <button
-                      className={text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white}
+                      className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
                       onClick={() => toggleArchive(c)}
                     >
                       {c.isArchived ? "Archiviert" : "Aktiv"}
