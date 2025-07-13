@@ -15,7 +15,8 @@ export default function Customers({ user }) {
     doneSessions: 0,
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
-    lastSessionDate: null
+    lastSessionDate: null,
+    totalPrice: "" // <--- NEU
   });
 
   useEffect(() => {
@@ -31,7 +32,6 @@ export default function Customers({ user }) {
     }
     const { data, error } = await query;
     if (!error) {
-      // Archivierte nach unten sortieren
       data.sort((a, b) => {
         if (a.isArchived === b.isArchived) {
           return new Date(b.date || b.created_at) - new Date(a.date || a.created_at);
@@ -56,7 +56,8 @@ export default function Customers({ user }) {
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate
         ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
-        : null
+        : null,
+      totalPrice: customer.totalPrice || "" // <--- NEU
     });
   }
 
@@ -116,7 +117,8 @@ export default function Customers({ user }) {
         doneSessions: parseInt(form.doneSessions),
         lastSessionDate: form.lastSessionDate
           ? new Date(form.lastSessionDate)
-          : now
+          : now,
+        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice) // <--- NEU
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
@@ -129,7 +131,8 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
+          totalPrice: "" // <--- NEU
         });
         loadCustomers();
       }
@@ -142,7 +145,8 @@ export default function Customers({ user }) {
         doneSessions: parseInt(form.doneSessions),
         date: now,
         isArchived: false,
-        lastSessionDate: now
+        lastSessionDate: now,
+        totalPrice: form.totalPrice === "" ? null : parseFloat(form.totalPrice) // <--- NEU
       }]);
       if (!error) {
         const customerObj = { ...form, id, sessions: parseInt(form.sessions), tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
@@ -157,7 +161,8 @@ export default function Customers({ user }) {
           doneSessions: 0,
           tattooist: user.role === "admin" ? "" : user.username,
           isArchived: false,
-          lastSessionDate: null
+          lastSessionDate: null,
+          totalPrice: "" // <--- NEU
         });
         loadCustomers();
       }
@@ -181,7 +186,6 @@ export default function Customers({ user }) {
     return date.toLocaleDateString("de-DE");
   }
 
-  // --- FARBLICHES HIGHLIGHT (Grünlich) ---
   function isHighlight(c) {
     if (!c.lastSessionDate) return false;
     const last = new Date(c.lastSessionDate);
@@ -249,6 +253,18 @@ export default function Customers({ user }) {
             required
           />
         </div>
+        {/* NEU: Gesamtpreis */}
+        <div>
+          <input
+            className="w-full p-3 rounded bg-gray-900 text-white"
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="Gesamtpreis (optional)"
+            value={form.totalPrice}
+            onChange={e => setForm({ ...form, totalPrice: e.target.value })}
+          />
+        </div>
         {user.role === "admin" && (
           <input
             className="w-full p-3 rounded bg-gray-900 text-white"
@@ -276,7 +292,7 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null }); }}
+            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, totalPrice: "" }); }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
@@ -302,6 +318,7 @@ export default function Customers({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
                 <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
+                <th className="py-4 px-4 text-left font-semibold">Gesamtpreis</th> {/* NEU */}
                 <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
                 <th className="py-4 px-4"></th>
               </tr>
@@ -317,6 +334,11 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.sessions}</td>
                   <td className="py-4 px-4">{c.doneSessions}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
+                  <td className="py-4 px-4">
+                    {c.totalPrice !== null && c.totalPrice !== undefined && c.totalPrice !== ""
+                      ? `${Number(c.totalPrice).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`
+                      : ""}
+                  </td>
                   <td className="py-4 px-4">
                     <button
                       className={`text-xs px-2 py-1 rounded-full ${c.isArchived ? "bg-yellow-700" : "bg-green-700"} text-white`}
@@ -347,13 +369,4 @@ export default function Customers({ user }) {
       </div>
     </div>
   );
-}
-
-// Highlight: ab 2 Tage her und noch nicht fertig --> grünlich!
-function isHighlight(c) {
-  if (!c.lastSessionDate) return false;
-  const last = new Date(c.lastSessionDate);
-  const now = new Date();
-  const days = (now - last) / (1000 * 60 * 60 * 24);
-  return days >= 2 && c.doneSessions < c.sessions && !c.isArchived;
 }
