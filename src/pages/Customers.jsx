@@ -3,21 +3,23 @@ import { supabase } from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
 export default function Customers({ user }) {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editCustomer, setEditCustomer] = useState(null);
-  const [form, setForm] = useState({
+  // Standard: alle Felder leer (außer Tätowierer für User ≠ Admin)
+  const emptyForm = {
     name: "",
     phone: "",
     placement: "",
     tattooName: "",
-    sessions: 1,
-    doneSessions: 0,
+    sessions: "",
+    doneSessions: "",
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
     lastSessionDate: null,
-    discount: 0,
-  });
+    discount: "",
+  };
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editCustomer, setEditCustomer] = useState(null);
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     loadCustomers();
@@ -32,7 +34,6 @@ export default function Customers({ user }) {
     }
     const { data, error } = await query;
     if (!error) {
-      // Archivierte nach unten sortieren
       data.sort((a, b) => {
         if (a.isArchived === b.isArchived) {
           return new Date(b.date || b.created_at) - new Date(a.date || a.created_at);
@@ -51,14 +52,14 @@ export default function Customers({ user }) {
       phone: customer.phone,
       placement: customer.placement,
       tattooName: customer.tattooName,
-      sessions: customer.sessions,
-      doneSessions: customer.doneSessions,
+      sessions: customer.sessions || "",
+      doneSessions: customer.doneSessions || "",
       tattooist: customer.tattooist,
       isArchived: customer.isArchived,
       lastSessionDate: customer.lastSessionDate
         ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
         : null,
-      discount: customer.discount || 0,
+      discount: customer.discount === 0 || customer.discount ? customer.discount : "",
     });
   }
 
@@ -83,7 +84,7 @@ export default function Customers({ user }) {
     const invoiceCount = yearInvoices ? yearInvoices.length + 1 : 1;
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
-    const sessions = Number(customer.sessions);
+    const sessions = Number(customer.sessions) || 0;
     const discount = customer.discount ? Number(customer.discount) : 0;
 
     let amountNet = sessions * 1500;
@@ -119,27 +120,16 @@ export default function Customers({ user }) {
     if (editCustomer) {
       const { error } = await supabase.from("customers").update({
         ...form,
+        sessions: parseInt(form.sessions) || 0,
+        doneSessions: parseInt(form.doneSessions) || 0,
         discount: parseInt(form.discount) || 0,
-        sessions: parseInt(form.sessions),
-        doneSessions: parseInt(form.doneSessions),
         lastSessionDate: form.lastSessionDate
           ? new Date(form.lastSessionDate)
           : now
       }).eq("id", editCustomer.id);
       if (!error) {
         setEditCustomer(null);
-        setForm({
-          name: "",
-          phone: "",
-          placement: "",
-          tattooName: "",
-          sessions: 1,
-          doneSessions: 0,
-          tattooist: user.role === "admin" ? "" : user.username,
-          isArchived: false,
-          lastSessionDate: null,
-          discount: 0,
-        });
+        setForm(emptyForm);
         loadCustomers();
       }
     } else {
@@ -147,29 +137,27 @@ export default function Customers({ user }) {
       const { error } = await supabase.from("customers").insert([{
         id,
         ...form,
+        sessions: parseInt(form.sessions) || 0,
+        doneSessions: parseInt(form.doneSessions) || 0,
         discount: parseInt(form.discount) || 0,
-        sessions: parseInt(form.sessions),
-        doneSessions: parseInt(form.doneSessions),
         date: now,
         isArchived: false,
         lastSessionDate: now
       }]);
       if (!error) {
-        const customerObj = { ...form, id, sessions: parseInt(form.sessions), discount: parseInt(form.discount) || 0, tattooist: form.tattooist, name: form.name, tattooName: form.tattooName, placement: form.placement };
+        const customerObj = {
+          ...form,
+          id,
+          sessions: parseInt(form.sessions) || 0,
+          discount: parseInt(form.discount) || 0,
+          tattooist: form.tattooist,
+          name: form.name,
+          tattooName: form.tattooName,
+          placement: form.placement
+        };
         await createInvoiceForCustomer(customerObj);
 
-        setForm({
-          name: "",
-          phone: "",
-          placement: "",
-          tattooName: "",
-          sessions: 1,
-          doneSessions: 0,
-          tattooist: user.role === "admin" ? "" : user.username,
-          isArchived: false,
-          lastSessionDate: null,
-          discount: 0,
-        });
+        setForm(emptyForm);
         loadCustomers();
       }
     }
@@ -295,7 +283,7 @@ export default function Customers({ user }) {
         {editCustomer && (
           <button
             type="button"
-            onClick={() => { setEditCustomer(null); setForm({ name: "", phone: "", placement: "", tattooName: "", sessions: 1, doneSessions: 0, tattooist: user.role === "admin" ? "" : user.username, isArchived: false, lastSessionDate: null, discount: 0 }); }}
+            onClick={() => { setEditCustomer(null); setForm(emptyForm); }}
             className="ml-3 text-gray-400 underline"
           >
             Abbrechen
