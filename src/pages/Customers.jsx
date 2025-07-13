@@ -3,7 +3,6 @@ import { supabase } from "../supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
 export default function Customers({ user }) {
-  // Standard: alle Felder leer (außer Tätowierer für User ≠ Admin)
   const emptyForm = {
     name: "",
     phone: "",
@@ -14,7 +13,7 @@ export default function Customers({ user }) {
     tattooist: user.role === "admin" ? "" : user.username,
     isArchived: false,
     lastSessionDate: null,
-    discount: "",
+    totalAmount: "",
   };
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +58,7 @@ export default function Customers({ user }) {
       lastSessionDate: customer.lastSessionDate
         ? new Date(customer.lastSessionDate).toISOString().split("T")[0]
         : null,
-      discount: customer.discount === 0 || customer.discount ? customer.discount : "",
+      totalAmount: customer.totalAmount === 0 || customer.totalAmount ? customer.totalAmount : "",
     });
   }
 
@@ -85,11 +84,11 @@ export default function Customers({ user }) {
     const invoiceNumber = `SKE-${year}-${String(invoiceCount).padStart(3, "0")}`;
     const tax = await getTax();
     const sessions = Number(customer.sessions) || 0;
-    const discount = customer.discount ? Number(customer.discount) : 0;
-
-    let amountNet = sessions * 1500;
-    if (discount > 0) {
-      amountNet = amountNet * (1 - discount / 100);
+    let amountNet = 0;
+    if (customer.totalAmount && Number(customer.totalAmount) > 0) {
+      amountNet = Number(customer.totalAmount);
+    } else {
+      amountNet = sessions * 1500;
     }
     const materialCosts = sessions * 500;
     const tattooistWage = sessions * 1000;
@@ -106,7 +105,7 @@ export default function Customers({ user }) {
       sessions,
       amount: finalAmount,
       tax,
-      discount, // Optional: Discount zur Rechnung speichern
+      totalAmount: amountNet,
       customerId: customer.id,
       materialCosts: materialCosts,
       tattooistWage: tattooistWage,
@@ -122,7 +121,7 @@ export default function Customers({ user }) {
         ...form,
         sessions: parseInt(form.sessions) || 0,
         doneSessions: parseInt(form.doneSessions) || 0,
-        discount: parseInt(form.discount) || 0,
+        totalAmount: form.totalAmount ? parseInt(form.totalAmount) : null,
         lastSessionDate: form.lastSessionDate
           ? new Date(form.lastSessionDate)
           : now
@@ -139,7 +138,7 @@ export default function Customers({ user }) {
         ...form,
         sessions: parseInt(form.sessions) || 0,
         doneSessions: parseInt(form.doneSessions) || 0,
-        discount: parseInt(form.discount) || 0,
+        totalAmount: form.totalAmount ? parseInt(form.totalAmount) : null,
         date: now,
         isArchived: false,
         lastSessionDate: now
@@ -149,7 +148,7 @@ export default function Customers({ user }) {
           ...form,
           id,
           sessions: parseInt(form.sessions) || 0,
-          discount: parseInt(form.discount) || 0,
+          totalAmount: form.totalAmount ? parseInt(form.totalAmount) : null,
           tattooist: form.tattooist,
           name: form.name,
           tattooName: form.tattooName,
@@ -250,10 +249,10 @@ export default function Customers({ user }) {
             className="flex-1 p-3 rounded bg-gray-900 text-white"
             type="number"
             min={0}
-            max={100}
-            placeholder="Rabatt (%)"
-            value={form.discount}
-            onChange={e => setForm({ ...form, discount: e.target.value })}
+            step="1"
+            placeholder="Gesamtbetrag (€) – optional"
+            value={form.totalAmount}
+            onChange={e => setForm({ ...form, totalAmount: e.target.value })}
           />
         </div>
         {user.role === "admin" && (
@@ -308,7 +307,7 @@ export default function Customers({ user }) {
                 <th className="py-4 px-4 text-left font-semibold">Stelle</th>
                 <th className="py-4 px-4 text-left font-semibold">Sitzungen</th>
                 <th className="py-4 px-4 text-left font-semibold">Bisherige</th>
-                <th className="py-4 px-4 text-left font-semibold">Rabatt (%)</th>
+                <th className="py-4 px-4 text-left font-semibold">Gesamtbetrag (€)</th>
                 <th className="py-4 px-4 text-left font-semibold">Letzte Session</th>
                 <th className="py-4 px-4 text-left font-semibold">Archiviert</th>
                 <th className="py-4 px-4"></th>
@@ -324,7 +323,7 @@ export default function Customers({ user }) {
                   <td className="py-4 px-4">{c.placement}</td>
                   <td className="py-4 px-4">{c.sessions}</td>
                   <td className="py-4 px-4">{c.doneSessions}</td>
-                  <td className="py-4 px-4">{c.discount || 0}</td>
+                  <td className="py-4 px-4">{c.totalAmount || 0}</td>
                   <td className="py-4 px-4">{formatDate(c.lastSessionDate)}</td>
                   <td className="py-4 px-4">
                     <button
